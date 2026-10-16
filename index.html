@@ -48,7 +48,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-
 .dot{width:12px;height:12px;border-radius:50%;flex:none;border:1px solid rgba(0,0,0,.08)}
 .empty{color:var(--muted);font-size:14px}
 label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:var(--muted)}
-label.f input,label.f select{font:inherit;font-size:15px;font-weight:400;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:40px;width:100%}
+label.f input,label.f select,label.f textarea{font:inherit;font-size:15px;font-weight:400;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:40px;width:100%}
 .hint{font-size:12px;font-weight:400;color:var(--muted)}
 .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .err{color:var(--danger);font-size:14px}
@@ -81,7 +81,8 @@ label.f input,label.f select{font:inherit;font-size:15px;font-weight:400;color:v
 .poster .brk{grid-column:1 / -1;margin:24px 0;background:#ececec;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:24px;font-weight:700;color:#3d3d3c}
 .poster .pc{margin:2px 1px;padding:0 6px;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:2px;overflow:hidden}
 .poster .pt{font-size:15px;line-height:19px;font-weight:700}
-.poster .pn{font-size:16px;line-height:20px;font-weight:700}
+.poster .pn{font-size:16px;line-height:20px;font-weight:700;white-space:pre-line}
+label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
 .poster .ptg{margin-top:5px;font-size:12px;line-height:16px;font-weight:500;padding:3px 11px;border-radius:999px;white-space:nowrap}
 .poster .spc{margin:2px 1px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;color:#565655;font-size:14px;line-height:20px}
 .poster .spc b{color:#141414;font-size:16px;line-height:20px}
@@ -141,7 +142,7 @@ label.f input,label.f select{font:inherit;font-size:15px;font-weight:400;color:v
               <label class="f">Начало<input type="time" id="f-start" step="300" required></label>
               <label class="f">Конец<input type="time" id="f-end" step="300" required></label>
             </div>
-            <label class="f">Название<input type="text" id="f-name" required></label>
+            <label class="f">Название<textarea id="f-name" rows="2" required></textarea><span class="hint">Enter — перенос на новую строку в картинке</span></label>
             <label class="f">Тег<input type="text" id="f-tag"><span class="hint">Пусто — подставится тег направления</span></label>
             <label class="f">Подпись времени<input type="text" id="f-tlabel" placeholder="например: с 21:00"><span class="hint">Пусто — покажется «начало–конец»</span></label>
             <div class="err" id="f-err" hidden></div>
@@ -325,7 +326,7 @@ function renderList(){
   for(var d=0;d<7;d++){
     var cs=state.classes.filter(function(c){return c.day===d}).sort(function(a,b){return toMin(a.start)-toMin(b.start)});
     out.push('<div class="daygrp"><h3>'+DAYS[d]+'</h3>'+
-      (cs.length?cs.map(function(c){var dd=dm[c.dir];return '<button type="button" class="row" data-id="'+esc(c.id)+'"><span class="tm">'+fmt(c.start)+'–'+fmt(c.end)+'</span><span class="nm">'+esc(c.name)+'</span><span class="dot" style="background:'+esc(dd?dd.color:"#e9e9e9")+'"></span></button>'}).join(""):'<div class="empty">Нет занятий</div>')+
+      (cs.length?cs.map(function(c){var dd=dm[c.dir];return '<button type="button" class="row" data-id="'+esc(c.id)+'"><span class="tm">'+fmt(c.start)+'–'+fmt(c.end)+'</span><span class="nm">'+esc(String(c.name).replace(/\s*\n\s*/g," "))+'</span><span class="dot" style="background:'+esc(dd?dd.color:"#e9e9e9")+'"></span></button>'}).join(""):'<div class="empty">Нет занятий</div>')+
       '<button type="button" class="btn small" data-add="'+d+'" style="align-self:flex-start;margin-top:4px">+ Занятие</button></div>');
   }
   $("list").innerHTML=out.join("");
@@ -368,7 +369,7 @@ $("f-del").addEventListener("click",async function(){
 });
 $("form").addEventListener("submit",async function(e){
   e.preventDefault();var err=$("f-err");
-  var start=$("f-start").value,end=$("f-end").value,name=$("f-name").value.trim();
+  var start=$("f-start").value,end=$("f-end").value,name=$("f-name").value.split("\n").map(function(l){return l.trim()}).filter(Boolean).join("\n");
   if(!name||!start||!end){err.textContent="Заполните название, начало и конец.";err.hidden=false;return}
   if(toMin(end)<=toMin(start)){err.textContent="Конец должен быть позже начала.";err.hidden=false;return}
   var body={studio:STUDIO,day:+$("f-day").value,dir:$("f-dir").value,start_time:start,end_time:end,name:name,tag:$("f-tag").value.trim(),time_label:$("f-tlabel").value.trim(),updated_at:new Date().toISOString()};
