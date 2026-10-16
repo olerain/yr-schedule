@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Расписание YOGI ROOM</title>
+<style>
+@font-face{font-family:"Tilda Sans";src:url(fonts/TildaSans-Regular.ttf) format("truetype");font-weight:400}
+@font-face{font-family:"Tilda Sans";src:url(fonts/TildaSans-Medium.ttf) format("truetype");font-weight:500}
+@font-face{font-family:"Tilda Sans";src:url(fonts/TildaSans-Semibold.ttf) format("truetype");font-weight:600}
+@font-face{font-family:"Tilda Sans";src:url(fonts/TildaSans-Bold.ttf) format("truetype");font-weight:700}
+:root{
+  --bg:#f3f4f4; --surface:#ffffff; --fg:#141414; --muted:#5d6262; --line:#dfe2e2;
+  --accent:#00838b; --accent-fg:#ffffff; --danger:#b3261e;
+  --font:"Tilda Sans","Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.4}
+.wrap{max-width:1500px;margin:0 auto;padding:20px max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:16px}
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.top h1{margin:0;font-size:22px;line-height:28px;font-weight:700}
+.sub{color:var(--muted);font-size:14px}
+.btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:9px 16px;border-radius:8px;cursor:pointer;min-height:40px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.danger{color:var(--danger)}
+.btn.small{padding:5px 10px;min-height:32px;font-size:14px}
+.btn:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn[disabled]{opacity:.5;cursor:default}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.main{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.preview{flex:999 1 600px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
+.stage{position:relative;width:100%;overflow:hidden}
+.stage .poster{position:absolute;left:0;top:0;transform-origin:0 0}
+.panel{flex:1 1 360px;min-width:0;max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;font:inherit;font-weight:600;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:12px 6px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+.pane{padding:16px;display:flex;flex-direction:column;gap:14px}
+.daygrp{display:flex;flex-direction:column;gap:4px}
+.daygrp h3{margin:6px 0 2px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;width:100%}
+.row:hover{border-color:var(--accent)}
+.row .tm{font-variant-numeric:tabular-nums;font-weight:700;min-width:92px}
+.row .nm{flex:1;min-width:0}
+.dot{width:12px;height:12px;border-radius:50%;flex:none;border:1px solid rgba(0,0,0,.08)}
+.empty{color:var(--muted);font-size:14px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:var(--muted)}
+label.f input,label.f select{font:inherit;font-size:15px;font-weight:400;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:40px;width:100%}
+.hint{font-size:12px;font-weight:400;color:var(--muted)}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.err{color:var(--danger);font-size:14px}
+.dirrow{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px 10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:8px}
+.dirrow input[type=color]{width:44px;height:40px;border:1px solid var(--line);border-radius:8px;padding:2px;background:var(--bg)}
+.dirrow .full{grid-column:1 / -1}
+.chk{display:flex;align-items:center;gap:8px;font-size:14px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;z-index:10}
+.notice{padding:24px;color:var(--muted);text-align:center}
+.login{padding:16px;display:flex;flex-direction:column;gap:12px}
+#exportHost{position:fixed;left:-20000px;top:0}
+
+/* Poster: fixed light look, 1600px wide, exported as PNG */
+.poster{width:1600px;padding:48px;background:#ffffff;color:#141414;font-family:var(--font);display:flex;flex-direction:column}
+.poster .ph{display:flex;justify-content:space-between;align-items:flex-end;gap:40px}
+.poster .ph-l{display:flex;flex-direction:column;gap:14px}
+.poster .brand{display:flex;align-items:center;gap:20px}
+.poster .brand img{height:40px;width:auto;max-width:none}
+.poster .vr{width:1px;height:32px;background:#c9c8c8}
+.poster .addr{font-size:18px;line-height:24px;color:#565655}
+.poster .ttl{margin:0;font-size:40px;line-height:44px;font-weight:500}
+.poster .mon{font-size:44px;line-height:48px;font-weight:700;color:#00838b}
+.poster .days{margin-top:24px;display:grid;grid-template-columns:72px repeat(7,minmax(0,1fr));background:#00838b}
+.poster .dh{padding:16px 0;text-align:center;font-size:16px;line-height:20px;font-weight:700;color:#ffffff}
+.poster .grid{margin-top:12px;display:grid;grid-template-columns:72px repeat(7,minmax(0,1fr))}
+.poster .vl{border-left:1px solid #e9e9e9}
+.poster .ln{grid-column:2 / -1;border-top:1px solid #e4e4e4}
+.poster .lh{grid-column:2 / -1;border-top:1px solid #f1f1f1}
+.poster .hl{grid-column:1;font-size:14px;line-height:16px;color:#565655;font-weight:600;margin-top:-8px;text-align:center}
+.poster .brk{grid-column:1 / -1;margin:24px 0;background:#ececec;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:24px;font-weight:700;color:#3d3d3c}
+.poster .pc{margin:2px 1px;padding:0 6px;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:2px;overflow:hidden}
+.poster .pt{font-size:15px;line-height:19px;font-weight:700}
+.poster .pn{font-size:16px;line-height:20px;font-weight:700}
+.poster .ptg{margin-top:5px;font-size:12px;line-height:16px;font-weight:500;padding:3px 11px;border-radius:999px;white-space:nowrap}
+.poster .spc{margin:2px 1px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;color:#565655;font-size:14px;line-height:20px}
+.poster .spc b{color:#141414;font-size:16px;line-height:20px}
+.poster .lgd{margin-top:32px;padding-left:72px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 24px}
+.poster .lgi{display:flex;align-items:center;gap:10px;font-size:16px;line-height:20px}
+.poster .lgd .d{width:18px;height:18px;border-radius:50%}
+.poster .ft{margin-top:40px;padding-top:24px;border-top:1px solid #e9e8e8;display:flex;justify-content:space-between;align-items:center;gap:40px}
+.poster .ft .fl{font-size:18px;line-height:24px}
+.poster .ft .fp{font-size:26px;line-height:32px;font-weight:700;color:#00838b;white-space:nowrap}
+.editable .pc{cursor:pointer}
+.editable .pc:hover{outline:2px solid #00838b;outline-offset:-2px}
+.poster .pc.sel{outline:3px solid #00838b;outline-offset:-3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Расписание YOGI ROOM</h1>
+      <div class="sub" id="sub">Загружаю расписание…</div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="logout" type="button" hidden>Выйти</button>
+      <button class="btn primary" id="dl" type="button" disabled>Скачать PNG</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="preview">
+      <div class="stage" id="stage"><div class="notice">Расписание появится здесь, как только загрузится.</div></div>
+    </div>
+    <div class="panel" id="panel">
+      <form class="login" id="login" novalidate>
+        <div style="font-weight:700;font-size:17px">Вход для редакторов</div>
+        <label class="f">Email<input type="email" id="l-email" autocomplete="username" required></label>
+        <div class="err" id="l-err" hidden></div>
+        <div class="hint" id="l-ok" hidden></div>
+        <div class="actions"><button class="btn primary" type="submit" id="l-btn">Прислать ссылку для входа</button></div>
+        <div class="hint">Пароль не нужен: на почту придёт ссылка, по ней откроется редактор. Смотреть и скачивать расписание можно без входа.</div>
+      </form>
+
+      <div id="editor" hidden>
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" id="t-cls" aria-selected="true">Занятия</button>
+          <button type="button" role="tab" id="t-dir" aria-selected="false">Направления</button>
+          <button type="button" role="tab" id="t-set" aria-selected="false">Шапка и подвал</button>
+        </div>
+
+        <div class="pane" id="p-cls">
+          <div id="list"></div>
+          <form id="form" hidden novalidate>
+            <div style="font-weight:700;font-size:17px" id="formTitle">Занятие</div>
+            <div class="two">
+              <label class="f">День<select id="f-day"></select></label>
+              <label class="f">Направление<select id="f-dir"></select></label>
+            </div>
+            <div class="two">
+              <label class="f">Начало<input type="time" id="f-start" step="300" required></label>
+              <label class="f">Конец<input type="time" id="f-end" step="300" required></label>
+            </div>
+            <label class="f">Название<input type="text" id="f-name" required></label>
+            <label class="f">Тег<input type="text" id="f-tag"><span class="hint">Пусто — подставится тег направления</span></label>
+            <label class="f">Подпись времени<input type="text" id="f-tlabel" placeholder="например: с 21:00"><span class="hint">Пусто — покажется «начало–конец»</span></label>
+            <div class="err" id="f-err" hidden></div>
+            <div class="actions">
+              <button class="btn primary" type="submit" id="f-save">Сохранить</button>
+              <button class="btn" type="button" id="f-cancel">Отмена</button>
+              <button class="btn danger" type="button" id="f-del">Удалить</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="pane" id="p-dir" hidden>
+          <div class="hint">Цвет, название и тег по умолчанию. Порядок здесь — порядок в легенде.</div>
+          <div id="dirs" style="display:flex;flex-direction:column;gap:10px"></div>
+          <div class="err" id="d-err" hidden></div>
+          <div class="actions">
+            <button class="btn" type="button" id="d-add">Добавить направление</button>
+            <button class="btn primary" type="button" id="d-save">Сохранить направления</button>
+          </div>
+        </div>
+
+        <div class="pane" id="p-set" hidden>
+          <label class="f">Месяц<input type="text" id="s-month"></label>
+          <label class="f">Заголовок<input type="text" id="s-title"></label>
+          <label class="f">Адрес<input type="text" id="s-addr"></label>
+          <label class="f">Строка о записи<input type="text" id="s-footer"></label>
+          <label class="f">Телефон<input type="text" id="s-phone"></label>
+          <label class="chk"><input type="checkbox" id="s-sp-on"> Блок «специальные занятия» в пустом вечере</label>
+          <label class="f">Заголовок блока<input type="text" id="s-sp-title"></label>
+          <label class="f">Текст блока<input type="text" id="s-sp-text"></label>
+          <div style="font-size:13px;font-weight:600;color:var(--muted)">Дни блока</div>
+          <div class="actions" id="s-sp-days"></div>
+          <div class="actions"><button class="btn primary" type="button" id="s-save">Сохранить</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="exportHost"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+(function(){
+var SUPABASE_URL="https://hnmgnowascbkstlmhudz.supabase.co";
+var SUPABASE_KEY="sb_publishable_tNfXIJlGC6NEoSfKS_sS0A_mTlywn_D";
+var STUDIO="moskovsky";
+var sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+var DAYS=["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота","Воскресенье"];
+var DSH=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
+var state={cfg:null,dirs:[],classes:[],canEdit:false,editing:null};
+var $=function(id){return document.getElementById(id)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]})}
+function hhmm(t){return String(t||"").slice(0,5)}
+function toMin(t){var m=/^(\d{1,2}):(\d{2})/.exec(t||"");return m?(+m[1])*60+(+m[2]):NaN}
+function fmt(t){var m=toMin(t);return isNaN(m)?"":Math.floor(m/60)+":"+String(m%60).padStart(2,"0")}
+function toast(msg){var t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(function(){t.hidden=true},2400)}
+function dirMap(){var m={};state.dirs.forEach(function(d){m[d.key]=d});return m}
+
+/* ---------- data ---------- */
+async function load(){
+  var r=await Promise.all([
+    sb.from("sched_settings").select("*").eq("studio",STUDIO).maybeSingle(),
+    sb.from("sched_dirs").select("*").order("sort"),
+    sb.from("sched_classes").select("*").eq("studio",STUDIO)
+  ]);
+  var err=r.find(function(x){return x.error});
+  if(err){$("stage").innerHTML='<div class="notice">Не удалось загрузить расписание. Обновите страницу.</div>';$("sub").textContent="";return}
+  state.cfg=r[0].data;state.dirs=r[1].data||[];
+  state.classes=(r[2].data||[]).map(function(c){return {id:c.id,day:c.day,start:hhmm(c.start_time),end:hhmm(c.end_time),name:c.name,dir:c.dir,tag:c.tag,timeLabel:c.time_label}});
+  refresh();
+}
+function refresh(){
+  if(!state.cfg){$("stage").innerHTML='<div class="notice">Расписание ещё не заполнено.</div>';poster=null;return}
+  if(state.editing&&state.editing!=="__new"&&!state.classes.some(function(c){return c.id===state.editing}))closeForm();
+  renderPoster();if(state.canEdit)renderList();
+  $("sub").textContent=(state.cfg.month||"")+" · занятий в неделю: "+state.classes.length+(state.canEdit?" · нажмите на занятие, чтобы изменить":"");
+  $("dl").disabled=false;
+}
+
+/* ---------- poster ---------- */
+function posterHTML(){
+  var cfg=state.cfg||{}, dm=dirMap();
+  var items=state.classes.map(function(c){
+    var rs=toMin(c.start), re=toMin(c.end);
+    if(isNaN(rs)||isNaN(re)||re<=rs)return null;
+    var s=Math.floor(rs/30)*30, e=Math.floor(re/30)*30; if(e<=s)e=s+30;
+    return {c:c,s:s,e:e,rs:rs,re:re};
+  }).filter(Boolean).sort(function(a,b){return a.s-b.s||a.e-b.e});
+  var segs=[],cur=null;
+  items.forEach(function(it){
+    if(!cur||it.s-cur.e>=120){cur={s:it.s,e:it.e,rEnd:it.re,items:[it]};segs.push(cur)}
+    else{cur.e=Math.max(cur.e,it.e);cur.rEnd=Math.max(cur.rEnd,it.re);cur.items.push(it)}
+  });
+  var rows=[],line=1,html=[];
+  segs.forEach(function(sg,i){
+    sg.l0=line;var n=(sg.e-sg.s)/30;rows.push("repeat("+n+",52px)");line+=n;sg.l1=line;
+    if(i<segs.length-1){sg.brk=line;rows.push("104px");line+=1}
+  });
+  rows.push("8px");
+  function L(sg,m){return sg.l0+(m-sg.s)/30}
+  function hm(m){return Math.floor(m/60)+":"+String(m%60).padStart(2,"0")}
+  segs.forEach(function(sg,i){
+    for(var d=0;d<7;d++)html.push('<div class="vl" style="grid-column:'+(d+2)+';grid-row:'+sg.l0+' / '+sg.l1+'"></div>');
+    for(var m=sg.s;m<=sg.e;m+=30){
+      html.push('<div class="'+(m%60===0?"ln":"lh")+'" style="grid-row:'+L(sg,m)+'"></div>');
+      if(m%60===0||m===sg.s)html.push('<div class="hl" style="grid-row:'+L(sg,m)+'">'+hm(m)+'</div>');
+    }
+    if(sg.brk){var nx=segs[i+1];
+      var nStart=Math.min.apply(null,nx.items.map(function(x){return x.rs}));
+      html.push('<div class="brk" style="grid-row:'+sg.brk+'">'+hm(sg.rEnd)+'–'+hm(nStart)+' · перерыв</div>');}
+    sg.items.forEach(function(it){
+      var c=it.c,d=dm[c.dir]||{color:"#e9e9e9",dark:false,tag:""};
+      var tag=(c.tag||"").trim()||d.tag||"";
+      var time=(c.timeLabel||"").trim()||(fmt(c.start)+"–"+fmt(c.end));
+      html.push('<div class="pc'+(state.editing===c.id?" sel":"")+'" data-id="'+esc(c.id)+'" style="grid-column:'+(c.day+2)+';grid-row:'+L(sg,it.s)+' / '+L(sg,it.e)+'">'+
+        '<div class="pt">'+esc(time)+'</div><div class="pn">'+esc(c.name)+'</div>'+
+        (tag?'<div class="ptg" style="background:'+esc(d.color)+';color:'+(d.dark?"#ffffff":"#141414")+'">'+esc(tag)+'</div>':'')+'</div>');
+    });
+  });
+  if(cfg.special_enabled&&segs.length&&(cfg.special_days||[]).length){
+    var last=segs[segs.length-1],days=cfg.special_days.slice().sort(),ok=true;
+    for(var k=1;k<days.length;k++)if(days[k]!==days[k-1]+1)ok=false;
+    last.items.forEach(function(it){if(days.indexOf(it.c.day)>=0)ok=false});
+    if(ok)html.push('<div class="spc" style="grid-column:'+(days[0]+2)+' / '+(days[days.length-1]+3)+';grid-row:'+last.l0+' / '+last.l1+'"><b>'+esc(cfg.special_title)+'</b><div>'+esc(cfg.special_text)+'</div></div>');
+  }
+  var legend=state.dirs.map(function(d){return '<div class="lgi"><div class="d" style="background:'+esc(d.color)+'"></div>'+esc(d.label)+'</div>'}).join("");
+  return '<div class="ph"><div class="ph-l"><div class="brand"><img src="logo.svg" alt="YOGI ROOM"><div class="vr"></div><div class="addr">'+esc(cfg.address)+'</div></div>'+
+    '<h2 class="ttl">'+esc(cfg.title)+'</h2></div><div class="mon">'+esc(cfg.month)+'</div></div>'+
+    '<div class="days"><div class="dh" style="font-size:14px">Время</div>'+DAYS.map(function(d){return '<div class="dh">'+d+'</div>'}).join("")+'</div>'+
+    (segs.length?'<div class="grid" style="grid-template-rows:'+rows.join(" ")+'">'+html.join("")+'</div>':'<div style="padding:80px;text-align:center;color:#565655;font-size:18px">Занятий пока нет</div>')+
+    '<div class="lgd">'+legend+'</div>'+
+    '<div class="ft"><div class="fl">'+esc(cfg.footer)+'</div><div class="fp">'+esc(cfg.phone)+'</div></div>';
+}
+var poster=null;
+function renderPoster(){
+  var st=$("stage");
+  if(!poster){st.innerHTML="";poster=document.createElement("div");poster.className="poster";st.appendChild(poster)}
+  poster.innerHTML=posterHTML();
+  st.classList.toggle("editable",state.canEdit);
+  fit();
+}
+function fit(){
+  if(!poster)return;var st=$("stage"),s=Math.min(1,st.clientWidth/1600);
+  poster.style.transform="scale("+s+")";st.style.height=Math.ceil(poster.offsetHeight*s)+"px";
+}
+new ResizeObserver(fit).observe($("stage"));
+$("stage").addEventListener("click",function(e){
+  if(!state.canEdit)return;var pc=e.target.closest(".pc");if(pc)openForm(pc.getAttribute("data-id"));
+});
+
+/* ---------- auth ---------- */
+async function applySession(session){
+  state.canEdit=false;
+  if(session){
+    var r=await sb.rpc("sched_is_editor");
+    state.canEdit=!r.error&&r.data===true;
+    if(!state.canEdit)toast("У этого аккаунта нет прав на редактирование");
+  }
+  $("login").hidden=!!session;$("logout").hidden=!session;$("editor").hidden=!state.canEdit;
+  refresh();
+}
+$("login").addEventListener("submit",async function(e){
+  e.preventDefault();var err=$("l-err"),ok=$("l-ok");err.hidden=true;ok.hidden=true;
+  var email=$("l-email").value.trim();
+  if(!/^\S+@\S+\.\S+$/.test(email)){err.textContent="Введите email.";err.hidden=false;return}
+  $("l-btn").disabled=true;
+  var r=await sb.auth.signInWithOtp({email:email,options:{emailRedirectTo:location.origin+location.pathname}});
+  $("l-btn").disabled=false;
+  if(r.error){err.textContent=r.error.status===429?"Слишком много писем подряд. Подождите немного и попробуйте снова.":"Не удалось отправить ссылку. Попробуйте ещё раз.";err.hidden=false;return}
+  ok.textContent="Ссылка отправлена на "+email+". Откройте письмо на этом же устройстве.";ok.hidden=false;
+});
+$("logout").addEventListener("click",function(){sb.auth.signOut()});
+sb.auth.onAuthStateChange(function(ev,session){if(ev==="INITIAL_SESSION"||ev==="SIGNED_IN"||ev==="SIGNED_OUT")setTimeout(function(){applySession(session)},0)});
+
+/* ---------- list ---------- */
+function renderList(){
+  var dm=dirMap(),out=[];
+  for(var d=0;d<7;d++){
+    var cs=state.classes.filter(function(c){return c.day===d}).sort(function(a,b){return toMin(a.start)-toMin(b.start)});
+    out.push('<div class="daygrp"><h3>'+DAYS[d]+'</h3>'+
+      (cs.length?cs.map(function(c){var dd=dm[c.dir];return '<button type="button" class="row" data-id="'+esc(c.id)+'"><span class="tm">'+fmt(c.start)+'–'+fmt(c.end)+'</span><span class="nm">'+esc(c.name)+'</span><span class="dot" style="background:'+esc(dd?dd.color:"#e9e9e9")+'"></span></button>'}).join(""):'<div class="empty">Нет занятий</div>')+
+      '<button type="button" class="btn small" data-add="'+d+'" style="align-self:flex-start;margin-top:4px">+ Занятие</button></div>');
+  }
+  $("list").innerHTML=out.join("");
+}
+$("list").addEventListener("click",function(e){
+  var r=e.target.closest(".row");if(r)return openForm(r.getAttribute("data-id"));
+  var a=e.target.closest("[data-add]");if(a)openForm(null,+a.getAttribute("data-add"));
+});
+
+/* ---------- class form ---------- */
+function fillSelects(){
+  $("f-day").innerHTML=DAYS.map(function(d,i){return '<option value="'+i+'">'+d+'</option>'}).join("");
+  $("f-dir").innerHTML=state.dirs.map(function(d){return '<option value="'+esc(d.key)+'">'+esc(d.label)+'</option>'}).join("");
+}
+var delArmed=false;
+function openForm(id,day){
+  var c=id?state.classes.find(function(x){return x.id===id}):null;
+  if(id&&!c)return;
+  state.editing=id||"__new";fillSelects();
+  $("formTitle").textContent=c?"Изменить занятие":"Новое занятие";
+  $("f-day").value=String(c?c.day:(day||0));
+  $("f-dir").value=c?c.dir:((state.dirs[0]||{}).key||"");
+  $("f-start").value=c?c.start:"";$("f-end").value=c?c.end:"";
+  $("f-name").value=c?c.name:"";$("f-tag").value=c?(c.tag||""):"";$("f-tlabel").value=c?(c.timeLabel||""):"";
+  updTagHint();
+  $("f-del").hidden=!c;$("f-del").textContent="Удалить";delArmed=false;$("f-err").hidden=true;
+  $("list").hidden=true;$("form").hidden=false;selectTab("cls");
+  renderPoster();$("f-name").focus();
+}
+function closeForm(){state.editing=null;$("form").hidden=true;$("list").hidden=false;if(state.cfg)renderPoster()}
+function updTagHint(){var d=dirMap()[$("f-dir").value];$("f-tag").placeholder=d&&d.tag?d.tag:""}
+$("f-dir").addEventListener("change",updTagHint);
+$("f-cancel").addEventListener("click",closeForm);
+$("f-del").addEventListener("click",async function(){
+  if(!delArmed){delArmed=true;$("f-del").textContent="Точно удалить?";return}
+  var id=state.editing;
+  var r=await sb.from("sched_classes").delete().eq("id",id);
+  if(r.error){toast("Не удалось удалить, попробуйте ещё раз");return}
+  closeForm();toast("Занятие удалено");load();
+});
+$("form").addEventListener("submit",async function(e){
+  e.preventDefault();var err=$("f-err");
+  var start=$("f-start").value,end=$("f-end").value,name=$("f-name").value.trim();
+  if(!name||!start||!end){err.textContent="Заполните название, начало и конец.";err.hidden=false;return}
+  if(toMin(end)<=toMin(start)){err.textContent="Конец должен быть позже начала.";err.hidden=false;return}
+  var body={studio:STUDIO,day:+$("f-day").value,dir:$("f-dir").value,start_time:start,end_time:end,name:name,tag:$("f-tag").value.trim(),time_label:$("f-tlabel").value.trim(),updated_at:new Date().toISOString()};
+  $("f-save").disabled=true;
+  var r=state.editing==="__new"?await sb.from("sched_classes").insert(body):await sb.from("sched_classes").update(body).eq("id",state.editing);
+  $("f-save").disabled=false;
+  if(r.error){err.textContent="Не удалось сохранить. Проверьте связь и попробуйте ещё раз.";err.hidden=false;return}
+  toast("Сохранено");closeForm();load();
+});
+
+/* ---------- directions ---------- */
+var dirDraft=[],dirOrig=[];
+function renderDirs(){
+  $("dirs").innerHTML=dirDraft.map(function(d,i){return '<div class="dirrow">'+
+    '<input type="color" id="dc-'+i+'" value="'+esc(d.color)+'" aria-label="Цвет">'+
+    '<label class="f">Название<input type="text" id="dl-'+i+'" value="'+esc(d.label)+'"></label>'+
+    '<label class="f full">Тег по умолчанию<input type="text" id="dt-'+i+'" value="'+esc(d.tag)+'"></label>'+
+    '<div class="full actions" style="justify-content:space-between"><label class="chk"><input type="checkbox" id="dd-'+i+'"'+(d.dark?" checked":"")+'> Белый текст на теге</label>'+
+    '<span class="actions"><button type="button" class="btn small" data-up="'+i+'"'+(i===0?" disabled":"")+'>Выше</button><button type="button" class="btn small danger" data-rm="'+i+'">Убрать</button></span></div></div>'}).join("");
+}
+function readDirs(){dirDraft=dirDraft.map(function(d,i){return {key:d.key,color:$("dc-"+i).value,label:$("dl-"+i).value.trim(),tag:$("dt-"+i).value.trim(),dark:$("dd-"+i).checked}})}
+$("dirs").addEventListener("click",function(e){
+  var up=e.target.closest("[data-up]"),rm=e.target.closest("[data-rm]");if(!up&&!rm)return;readDirs();$("d-err").hidden=true;
+  if(up){var i=+up.getAttribute("data-up");var t=dirDraft[i];dirDraft[i]=dirDraft[i-1];dirDraft[i-1]=t}
+  if(rm){var j=+rm.getAttribute("data-rm"),k=dirDraft[j].key,n=state.classes.filter(function(c){return c.dir===k}).length;
+    if(n){$("d-err").textContent="«"+dirDraft[j].label+"» стоит у занятий: "+n+". Сначала поменяйте им направление.";$("d-err").hidden=false;return}
+    dirDraft.splice(j,1)}
+  renderDirs();
+});
+$("d-add").addEventListener("click",function(){readDirs();dirDraft.push({key:"d"+Date.now().toString(36),color:"#e9e9e9",label:"Новое направление",tag:"",dark:false});renderDirs()});
+$("d-save").addEventListener("click",async function(){
+  readDirs();var err=$("d-err");err.hidden=true;
+  if(dirDraft.some(function(d){return !d.label})){err.textContent="У каждого направления должно быть название.";err.hidden=false;return}
+  var rows=dirDraft.map(function(d,i){return {key:d.key,label:d.label,color:d.color,tag:d.tag,dark:d.dark,sort:i+1}});
+  var keep=rows.map(function(r){return r.key});
+  var removed=dirOrig.filter(function(k){return keep.indexOf(k)<0});
+  var r=await sb.from("sched_dirs").upsert(rows);
+  if(!r.error&&removed.length)r=await sb.from("sched_dirs").delete().in("key",removed);
+  if(r.error){err.textContent="Не удалось сохранить направления.";err.hidden=false;return}
+  dirOrig=keep;toast("Направления сохранены");load();
+});
+
+/* ---------- settings ---------- */
+function fillSettings(){
+  var c=state.cfg||{};
+  $("s-month").value=c.month||"";$("s-title").value=c.title||"";$("s-addr").value=c.address||"";$("s-footer").value=c.footer||"";$("s-phone").value=c.phone||"";
+  $("s-sp-on").checked=!!c.special_enabled;$("s-sp-title").value=c.special_title||"";$("s-sp-text").value=c.special_text||"";
+  $("s-sp-days").innerHTML=DSH.map(function(d,i){return '<label class="chk"><input type="checkbox" id="sd-'+i+'"'+((c.special_days||[]).indexOf(i)>=0?" checked":"")+'> '+d+'</label>'}).join("");
+}
+$("s-save").addEventListener("click",async function(){
+  var days=[];for(var i=0;i<7;i++)if($("sd-"+i).checked)days.push(i);
+  var r=await sb.from("sched_settings").update({month:$("s-month").value.trim(),title:$("s-title").value.trim(),address:$("s-addr").value.trim(),footer:$("s-footer").value.trim(),phone:$("s-phone").value.trim(),
+    special_enabled:$("s-sp-on").checked,special_title:$("s-sp-title").value.trim(),special_text:$("s-sp-text").value.trim(),special_days:days,updated_at:new Date().toISOString()}).eq("studio",STUDIO);
+  if(r.error){toast("Не удалось сохранить");return}
+  toast("Сохранено");load();
+});
+
+/* ---------- tabs ---------- */
+function selectTab(n){
+  ["cls","dir","set"].forEach(function(k){$("t-"+k).setAttribute("aria-selected",k===n?"true":"false");$("p-"+k).hidden=k!==n});
+  if(n==="dir"){dirDraft=JSON.parse(JSON.stringify(state.dirs));dirOrig=state.dirs.map(function(d){return d.key});$("d-err").hidden=true;renderDirs()}
+  if(n==="set")fillSettings();
+}
+["cls","dir","set"].forEach(function(k){$("t-"+k).addEventListener("click",function(){selectTab(k)})});
+
+/* ---------- export ---------- */
+$("dl").addEventListener("click",async function(){
+  var btn=$("dl");btn.disabled=true;btn.textContent="Готовлю картинку…";
+  try{
+    var host=$("exportHost");host.innerHTML='<div class="poster">'+posterHTML().replace(" sel\"","\"")+'</div>';
+    await document.fonts.ready;
+    await Promise.all(Array.prototype.map.call(host.querySelectorAll("img"),function(im){return im.complete?0:new Promise(function(r){im.onload=im.onerror=r})}));
+    var canvas=await html2canvas(host.firstChild,{scale:2,backgroundColor:"#ffffff",logging:false});
+    host.innerHTML="";
+    var blob=await new Promise(function(r){canvas.toBlob(r,"image/png")});
+    var month=((state.cfg&&state.cfg.month)||"").toLowerCase().replace(/\s+/g,"-");
+    var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="raspisanie-moskovskiy"+(month?"-"+month:"")+".png";
+    document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},5000);
+  }catch(e){toast("Не получилось сохранить картинку")}
+  finally{btn.disabled=false;btn.textContent="Скачать PNG"}
+});
+
+load();
+})();
+</script>
+</body>
+</html>
