@@ -95,6 +95,34 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
 .editable .pc{cursor:pointer}
 .editable .pc:hover{outline:2px solid #00838b;outline-offset:-2px}
 .poster .pc.sel{outline:3px solid #00838b;outline-offset:-3px}
+
+/* Mode switch */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-weight:600;border:0;background:none;color:var(--muted);padding:9px 14px;min-height:40px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--fg);color:#fff}
+
+/* List poster: teal, 1080px wide, for clients */
+.poster.list{width:1080px;min-height:1350px;padding:64px 64px 56px;background:#00aab4;color:#ffffff}
+.list .lhd{display:flex;justify-content:space-between;align-items:flex-end;gap:32px;padding-bottom:26px;border-bottom:3px solid #ffffff}
+.list .lhd img{height:46px;width:auto;max-width:none;display:block}
+.list .la{margin-top:12px;font-size:22px;line-height:28px;opacity:.85}
+.list .lm{font-size:52px;line-height:56px;font-weight:500}
+.list .lb{flex:1;display:flex;flex-direction:column;justify-content:space-between;padding-top:6px}
+.list .ld{display:grid;grid-template-columns:84px minmax(0,1fr);padding:14px 0 13px;border-bottom:2px solid rgba(255,255,255,.3)}
+.list .ldn{font-size:26px;line-height:40px;font-weight:600}
+.list .lr{display:grid;grid-template-columns:96px minmax(0,1fr) auto;align-items:center;column-gap:16px;font-size:26px;line-height:40px;border-radius:6px}
+.list .lr .t{opacity:.8}
+.list .lr .n{font-weight:500}
+.list .lr .g{font-size:19px;line-height:26px;font-weight:500;background:rgba(255,255,255,.2);border-radius:999px;padding:3px 16px;white-space:nowrap}
+.list .lgap{height:14px}
+.list .lf{display:flex;align-items:center;gap:28px;padding-top:30px}
+.list .lf img{width:150px;height:150px;display:block;flex:none}
+.list .lf div{font-size:28px;line-height:36px;font-weight:500;max-width:520px}
+.list .lempty{padding:80px 0;text-align:center;font-size:26px;opacity:.85}
+.editable .lr{cursor:pointer}
+.editable .lr:hover{outline:2px solid #ffffff;outline-offset:2px}
+.list .lr.sel{outline:3px solid #ffffff;outline-offset:2px}
 </style>
 </head>
 <body>
@@ -105,6 +133,10 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
       <div class="sub" id="sub">Загружаю расписание…</div>
     </div>
     <div class="actions">
+      <div class="seg" role="group" aria-label="Вид расписания">
+        <button type="button" id="m-list" aria-pressed="true">Для клиентов</button>
+        <button type="button" id="m-grid" aria-pressed="false">Сетка (внутренняя)</button>
+      </div>
       <button class="btn" id="logout" type="button" hidden>Выйти</button>
       <button class="btn primary" id="dl" type="button" disabled>Скачать PNG</button>
     </div>
@@ -165,9 +197,12 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
         </div>
 
         <div class="pane" id="p-set" hidden>
-          <label class="f">Месяц<input type="text" id="s-month"></label>
-          <label class="f">Заголовок<input type="text" id="s-title"></label>
+          <label class="f">Месяц<input type="text" id="s-month"><span class="hint">В картинке для клиентов пишется строчными</span></label>
+          <label class="f">Ссылка на приложение (для QR)<input type="url" id="s-app-url"><span class="hint">Сама откроет App Store или Google Play</span></label>
+          <label class="f">Текст рядом с QR<input type="text" id="s-app-text"></label>
           <label class="f">Адрес<input type="text" id="s-addr"></label>
+          <div style="font-size:13px;font-weight:600;color:var(--muted);margin-top:6px">Только для сетки</div>
+          <label class="f">Заголовок<input type="text" id="s-title"></label>
           <label class="f">Строка о записи<input type="text" id="s-footer"></label>
           <label class="f">Телефон<input type="text" id="s-phone"></label>
           <label class="chk"><input type="checkbox" id="s-sp-on"> Блок «специальные занятия» в пустом вечере</label>
@@ -186,6 +221,7 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="qrcode.js"></script>
 <script>
 (function(){
 var SUPABASE_URL="https://hnmgnowascbkstlmhudz.supabase.co";
@@ -195,7 +231,9 @@ var sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 var DAYS=["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота","Воскресенье"];
 var DSH=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
-var state={cfg:null,dirs:[],classes:[],canEdit:false,editing:null};
+var state={cfg:null,dirs:[],classes:[],canEdit:false,editing:null,mode:"list"};
+try{if(localStorage.getItem("yr-sched-mode")==="grid")state.mode="grid"}catch(e){}
+var W={list:1080,grid:1600},BG={list:"#00aab4",grid:"#ffffff"};
 var $=function(id){return document.getElementById(id)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]})}
 function hhmm(t){return String(t||"").slice(0,5)}
@@ -226,7 +264,46 @@ function refresh(){
 }
 
 /* ---------- poster ---------- */
-function posterHTML(){
+function posterHTML(){return state.mode==="grid"?gridHTML():listHTML()}
+
+var qrCache={url:null,src:""};
+function qrSrc(url){
+  if(!url||typeof qrcode!=="function")return "";
+  if(qrCache.url===url)return qrCache.src;
+  var src="";
+  try{
+    var q=qrcode(0,"M");q.addData(url);q.make();
+    var n=q.getModuleCount(),cell=12,cv=document.createElement("canvas");
+    cv.width=cv.height=n*cell;var ctx=cv.getContext("2d");ctx.fillStyle="#ffffff";
+    for(var r=0;r<n;r++)for(var c=0;c<n;c++)if(q.isDark(r,c))ctx.fillRect(c*cell,r*cell,cell,cell);
+    src=cv.toDataURL("image/png");
+  }catch(e){src=""}
+  qrCache={url:url,src:src};return src;
+}
+function pad(t){var m=toMin(t);return isNaN(m)?"":String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")}
+
+function listHTML(){
+  var cfg=state.cfg||{}, dm=dirMap(), body=[];
+  for(var d=0;d<7;d++){
+    var cs=state.classes.filter(function(c){return c.day===d&&!isNaN(toMin(c.start))}).sort(function(a,b){return toMin(a.start)-toMin(b.start)});
+    if(!cs.length)continue;
+    var rows=[],prevEnd=null;
+    cs.forEach(function(c){
+      var s=toMin(c.start),e=toMin(c.end);
+      if(prevEnd!==null&&s-prevEnd>=120)rows.push('<div class="lgap"></div>');
+      prevEnd=isNaN(e)?s:Math.max(prevEnd||0,e);
+      var tag=((c.tag||"").trim()||(dm[c.dir]||{}).tag||"").toLowerCase();
+      rows.push('<div class="lr'+(state.editing===c.id?" sel":"")+'" data-id="'+esc(c.id)+'"><span class="t">'+pad(c.start)+'</span><span class="n">'+esc(String(c.name).replace(/\s*\n\s*/g," "))+'</span>'+(tag?'<span class="g">'+esc(tag)+'</span>':'<span></span>')+'</div>');
+    });
+    body.push('<div class="ld"><div class="ldn">'+DSH[d].toUpperCase()+'</div><div>'+rows.join("")+'</div></div>');
+  }
+  var qr=qrSrc(cfg.app_url);
+  return '<div class="lhd"><div><img src="logo-white.svg" alt="YOGI ROOM"><div class="la">'+esc(cfg.address)+'</div></div><div class="lm">'+esc(String(cfg.month||"").toLowerCase())+'</div></div>'+
+    (body.length?'<div class="lb">'+body.join("")+'</div>':'<div class="lempty">Занятий пока нет</div>')+
+    ((qr||cfg.app_text)?'<div class="lf">'+(qr?'<img src="'+qr+'" alt="QR-код приложения">':'')+'<div>'+esc(cfg.app_text)+'</div></div>':'');
+}
+
+function gridHTML(){
   var cfg=state.cfg||{}, dm=dirMap();
   var items=state.classes.map(function(c){
     var rs=toMin(c.start), re=toMin(c.end);
@@ -282,18 +359,28 @@ function posterHTML(){
 var poster=null;
 function renderPoster(){
   var st=$("stage");
-  if(!poster){st.innerHTML="";poster=document.createElement("div");poster.className="poster";st.appendChild(poster)}
+  if(!poster){st.innerHTML="";poster=document.createElement("div");st.appendChild(poster)}
+  poster.className="poster"+(state.mode==="list"?" list":"");
   poster.innerHTML=posterHTML();
   st.classList.toggle("editable",state.canEdit);
   fit();
 }
+function setMode(m){
+  state.mode=m;try{localStorage.setItem("yr-sched-mode",m)}catch(e){}
+  $("m-list").setAttribute("aria-pressed",m==="list"?"true":"false");
+  $("m-grid").setAttribute("aria-pressed",m==="grid"?"true":"false");
+  if(state.cfg)renderPoster();
+}
+$("m-list").addEventListener("click",function(){setMode("list")});
+$("m-grid").addEventListener("click",function(){setMode("grid")});
+setMode(state.mode);
 function fit(){
-  if(!poster)return;var st=$("stage"),s=Math.min(1,st.clientWidth/1600);
+  if(!poster)return;var st=$("stage"),s=Math.min(1,st.clientWidth/W[state.mode]);
   poster.style.transform="scale("+s+")";st.style.height=Math.ceil(poster.offsetHeight*s)+"px";
 }
 new ResizeObserver(fit).observe($("stage"));
 $("stage").addEventListener("click",function(e){
-  if(!state.canEdit)return;var pc=e.target.closest(".pc");if(pc)openForm(pc.getAttribute("data-id"));
+  if(!state.canEdit)return;var pc=e.target.closest(".pc,.lr");if(pc)openForm(pc.getAttribute("data-id"));
 });
 
 /* ---------- auth ---------- */
@@ -415,13 +502,13 @@ $("d-save").addEventListener("click",async function(){
 /* ---------- settings ---------- */
 function fillSettings(){
   var c=state.cfg||{};
-  $("s-month").value=c.month||"";$("s-title").value=c.title||"";$("s-addr").value=c.address||"";$("s-footer").value=c.footer||"";$("s-phone").value=c.phone||"";
+  $("s-month").value=c.month||"";$("s-app-url").value=c.app_url||"";$("s-app-text").value=c.app_text||"";$("s-title").value=c.title||"";$("s-addr").value=c.address||"";$("s-footer").value=c.footer||"";$("s-phone").value=c.phone||"";
   $("s-sp-on").checked=!!c.special_enabled;$("s-sp-title").value=c.special_title||"";$("s-sp-text").value=c.special_text||"";
   $("s-sp-days").innerHTML=DSH.map(function(d,i){return '<label class="chk"><input type="checkbox" id="sd-'+i+'"'+((c.special_days||[]).indexOf(i)>=0?" checked":"")+'> '+d+'</label>'}).join("");
 }
 $("s-save").addEventListener("click",async function(){
   var days=[];for(var i=0;i<7;i++)if($("sd-"+i).checked)days.push(i);
-  var r=await sb.from("sched_settings").update({month:$("s-month").value.trim(),title:$("s-title").value.trim(),address:$("s-addr").value.trim(),footer:$("s-footer").value.trim(),phone:$("s-phone").value.trim(),
+  var r=await sb.from("sched_settings").update({month:$("s-month").value.trim(),app_url:$("s-app-url").value.trim(),app_text:$("s-app-text").value.trim(),title:$("s-title").value.trim(),address:$("s-addr").value.trim(),footer:$("s-footer").value.trim(),phone:$("s-phone").value.trim(),
     special_enabled:$("s-sp-on").checked,special_title:$("s-sp-title").value.trim(),special_text:$("s-sp-text").value.trim(),special_days:days,updated_at:new Date().toISOString()}).eq("studio",STUDIO);
   if(r.error){toast("Не удалось сохранить");return}
   toast("Сохранено");load();
@@ -439,14 +526,15 @@ function selectTab(n){
 $("dl").addEventListener("click",async function(){
   var btn=$("dl");btn.disabled=true;btn.textContent="Готовлю картинку…";
   try{
-    var host=$("exportHost");host.innerHTML='<div class="poster">'+posterHTML().replace(" sel\"","\"")+'</div>';
+    var host=$("exportHost"),ed=state.editing;state.editing=null;
+    host.innerHTML='<div class="poster'+(state.mode==="list"?" list":"")+'">'+posterHTML()+'</div>';state.editing=ed;
     await document.fonts.ready;
     await Promise.all(Array.prototype.map.call(host.querySelectorAll("img"),function(im){return im.complete?0:new Promise(function(r){im.onload=im.onerror=r})}));
-    var canvas=await html2canvas(host.firstChild,{scale:2,backgroundColor:"#ffffff",logging:false});
+    var canvas=await html2canvas(host.firstChild,{scale:2,backgroundColor:BG[state.mode],logging:false});
     host.innerHTML="";
     var blob=await new Promise(function(r){canvas.toBlob(r,"image/png")});
     var month=((state.cfg&&state.cfg.month)||"").toLowerCase().replace(/\s+/g,"-");
-    var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="raspisanie-moskovskiy"+(month?"-"+month:"")+".png";
+    var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="raspisanie-moskovskiy"+(state.mode==="grid"?"-setka":"")+(month?"-"+month:"")+".png";
     document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},5000);
   }catch(e){toast("Не получилось сохранить картинку")}
   finally{btn.disabled=false;btn.textContent="Скачать PNG"}
