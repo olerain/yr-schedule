@@ -135,6 +135,7 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
       <div class="sub" id="sub">Загружаю расписание…</div>
     </div>
     <div class="actions">
+      <select class="btn" id="studio" aria-label="Студия"></select>
       <div class="seg" role="group" aria-label="Вид расписания">
         <button type="button" id="m-list" aria-pressed="true">Для клиентов</button>
         <button type="button" id="m-grid" aria-pressed="false">Сетка (внутренняя)</button>
@@ -156,6 +157,8 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
         <div class="actions"><button class="btn primary" type="submit" id="l-btn">Прислать ссылку для входа</button></div>
         <div class="hint">Пароль не нужен: на почту придёт ссылка, по ней откроется редактор. Смотреть и скачивать расписание можно без входа.</div>
       </form>
+
+      <div class="login" id="noacc" hidden></div>
 
       <div id="editor" hidden>
         <div class="tabs" role="tablist">
@@ -199,6 +202,7 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
         </div>
 
         <div class="pane" id="p-set" hidden>
+          <label class="f">Название студии<input type="text" id="s-name"><span class="hint">Как студия называется в переключателе</span></label>
           <label class="f">Месяц<input type="text" id="s-month"><span class="hint">В картинке для клиентов пишется строчными</span></label>
           <label class="f">Ссылка на приложение (для QR)<input type="url" id="s-app-url"><span class="hint">Сама откроет App Store или Google Play</span></label>
           <label class="f">Текст рядом с QR<input type="text" id="s-app-text"></label>
@@ -228,12 +232,14 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
 (function(){
 var SUPABASE_URL="https://hnmgnowascbkstlmhudz.supabase.co";
 var SUPABASE_KEY="sb_publishable_tNfXIJlGC6NEoSfKS_sS0A_mTlywn_D";
-var STUDIO="moskovsky";
+var STUDIO=(new URLSearchParams(location.search).get("studio")||"").trim();
+if(!STUDIO){try{STUDIO=localStorage.getItem("yr-sched-studio")||""}catch(e){}}
+if(!STUDIO)STUDIO="moskovsky";
 var sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 var DAYS=["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота","Воскресенье"];
 var DSH=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
-var state={cfg:null,dirs:[],classes:[],canEdit:false,editing:null,mode:"list"};
+var state={cfg:null,studios:[],dirs:[],classes:[],canEdit:false,session:null,access:{all:false,studios:[]},editing:null,mode:"list"};
 try{if(localStorage.getItem("yr-sched-mode")==="grid")state.mode="grid"}catch(e){}
 var W={list:1080,grid:1600},BG={list:"#00aab4",grid:"#ffffff"};
 var $=function(id){return document.getElementById(id)};
@@ -245,23 +251,57 @@ function toast(msg){var t=$("toast");t.textContent=msg;t.hidden=false;clearTimeo
 function dirMap(){var m={};state.dirs.forEach(function(d){m[d.key]=d});return m}
 
 /* ---------- data ---------- */
+var loadSeq=0;
 async function load(){
+  var seq=++loadSeq;
   var r=await Promise.all([
-    sb.from("sched_settings").select("*").eq("studio",STUDIO).maybeSingle(),
+    sb.from("sched_settings").select("*"),
     sb.from("sched_dirs").select("*").order("sort"),
     sb.from("sched_classes").select("*").eq("studio",STUDIO)
   ]);
+  if(seq!==loadSeq)return;
   var err=r.find(function(x){return x.error});
-  if(err){$("stage").innerHTML='<div class="notice">Не удалось загрузить расписание. Обновите страницу.</div>';$("sub").textContent="";return}
-  state.cfg=r[0].data;state.dirs=r[1].data||[];
+  if(err){$("stage").innerHTML='<div class="notice">Не удалось загрузить расписание. Обновите страницу.</div>';poster=null;$("sub").textContent="";return}
+  state.studios=(r[0].data||[]).slice().sort(function(a,b){return (a.sort||100)-(b.sort||100)||String(a.studio).localeCompare(b.studio)});
+  if(state.studios.length&&!state.studios.some(function(s){return s.studio===STUDIO})){setStudio(state.studios[0].studio);return}
+  state.cfg=state.studios.find(function(s){return s.studio===STUDIO})||null;
+  state.dirs=r[1].data||[];
   state.classes=(r[2].data||[]).map(function(c){return {id:c.id,day:c.day,start:hhmm(c.start_time),end:hhmm(c.end_time),name:c.name,dir:c.dir,tag:c.tag,timeLabel:c.time_label}});
+  renderStudios();applyAccess();
+}
+function studioName(s){return (s&&(s.name||s.studio))||""}
+function renderStudios(){
+  var sel=$("studio");
+  sel.innerHTML=state.studios.map(function(s){return '<option value="'+esc(s.studio)+'">'+esc(studioName(s))+'</option>'}).join("");
+  sel.value=STUDIO;sel.hidden=state.studios.length<2;
+}
+function setStudio(s){
+  if(!s)return;STUDIO=s;
+  try{localStorage.setItem("yr-sched-studio",s)}catch(e){}
+  try{var u=new URL(location.href);u.searchParams.set("studio",s);history.replaceState(null,"",u)}catch(e){}
+  if(state.editing){state.editing=null;$("form").hidden=true;$("list").hidden=false}
+  state.cfg=null;state.classes=[];poster=null;
+  $("stage").innerHTML='<div class="notice">Загружаю расписание…</div>';$("dl").disabled=true;
+  load();
+}
+$("studio").addEventListener("change",function(){setStudio(this.value)});
+function applyAccess(){
+  var a=state.access;
+  state.canEdit=!!state.session&&(a.all||a.studios.indexOf(STUDIO)>=0);
+  $("login").hidden=!!state.session;$("logout").hidden=!state.session;$("editor").hidden=!state.canEdit;
+  $("t-dir").hidden=!a.all;
+  if(!a.all&&!$("p-dir").hidden)selectTab("cls");
+  var na=$("noacc"),names=a.studios.map(function(k){return studioName(state.studios.find(function(s){return s.studio===k}))||k});
+  na.hidden=!state.session||state.canEdit;
+  if(!na.hidden)na.innerHTML=names.length?'<div style="font-weight:700;font-size:17px">Это расписание вам доступно только для просмотра</div><div class="hint">Вы можете редактировать: '+esc(names.join(", "))+'. Выберите свою студию вверху.</div>'
+    :'<div style="font-weight:700;font-size:17px">У этого аккаунта нет прав на редактирование</div><div class="hint">Попросите администратора добавить ваш email.</div>';
   refresh();
 }
 function refresh(){
   if(!state.cfg){$("stage").innerHTML='<div class="notice">Расписание ещё не заполнено.</div>';poster=null;return}
   if(state.editing&&state.editing!=="__new"&&!state.classes.some(function(c){return c.id===state.editing}))closeForm();
   renderPoster();if(state.canEdit)renderList();
-  $("sub").textContent=(state.cfg.month||"")+" · занятий в неделю: "+state.classes.length+(state.canEdit?" · нажмите на занятие, чтобы изменить":"");
+  $("sub").textContent=studioName(state.cfg)+" · "+(state.cfg.month||"").toLowerCase()+" · занятий в неделю: "+state.classes.length+(state.canEdit?" · нажмите на занятие, чтобы изменить":"");
   $("dl").disabled=false;
 }
 
@@ -387,14 +427,15 @@ $("stage").addEventListener("click",function(e){
 
 /* ---------- auth ---------- */
 async function applySession(session){
-  state.canEdit=false;
+  state.session=session||null;state.access={all:false,studios:[]};
   if(session){
-    var r=await sb.rpc("sched_is_editor");
-    state.canEdit=!r.error&&r.data===true;
-    if(!state.canEdit)toast("У этого аккаунта нет прав на редактирование");
+    var r=await sb.rpc("sched_my_access");
+    if(!r.error&&r.data)state.access={all:!!r.data.all,studios:r.data.studios||[]};
+    else if(r.error){var o=await sb.rpc("sched_is_editor");if(!o.error&&o.data===true)state.access={all:true,studios:[]}}
+    var a=state.access;
+    if(!a.all&&a.studios.length&&a.studios.indexOf(STUDIO)<0){setStudio(a.studios[0]);return}
   }
-  $("login").hidden=!!session;$("logout").hidden=!session;$("editor").hidden=!state.canEdit;
-  refresh();
+  applyAccess();
 }
 $("login").addEventListener("submit",async function(e){
   e.preventDefault();var err=$("l-err"),ok=$("l-ok");err.hidden=true;ok.hidden=true;
@@ -504,13 +545,13 @@ $("d-save").addEventListener("click",async function(){
 /* ---------- settings ---------- */
 function fillSettings(){
   var c=state.cfg||{};
-  $("s-month").value=c.month||"";$("s-app-url").value=c.app_url||"";$("s-app-text").value=c.app_text||"";$("s-title").value=c.title||"";$("s-addr").value=c.address||"";$("s-footer").value=c.footer||"";$("s-phone").value=c.phone||"";
+  $("s-name").value=c.name||"";$("s-month").value=c.month||"";$("s-app-url").value=c.app_url||"";$("s-app-text").value=c.app_text||"";$("s-title").value=c.title||"";$("s-addr").value=c.address||"";$("s-footer").value=c.footer||"";$("s-phone").value=c.phone||"";
   $("s-sp-on").checked=!!c.special_enabled;$("s-sp-title").value=c.special_title||"";$("s-sp-text").value=c.special_text||"";
   $("s-sp-days").innerHTML=DSH.map(function(d,i){return '<label class="chk"><input type="checkbox" id="sd-'+i+'"'+((c.special_days||[]).indexOf(i)>=0?" checked":"")+'> '+d+'</label>'}).join("");
 }
 $("s-save").addEventListener("click",async function(){
   var days=[];for(var i=0;i<7;i++)if($("sd-"+i).checked)days.push(i);
-  var r=await sb.from("sched_settings").update({month:$("s-month").value.trim(),app_url:$("s-app-url").value.trim(),app_text:$("s-app-text").value.trim(),title:$("s-title").value.trim(),address:$("s-addr").value.trim(),footer:$("s-footer").value.trim(),phone:$("s-phone").value.trim(),
+  var r=await sb.from("sched_settings").update({name:$("s-name").value.trim(),month:$("s-month").value.trim(),app_url:$("s-app-url").value.trim(),app_text:$("s-app-text").value.trim(),title:$("s-title").value.trim(),address:$("s-addr").value.trim(),footer:$("s-footer").value.trim(),phone:$("s-phone").value.trim(),
     special_enabled:$("s-sp-on").checked,special_title:$("s-sp-title").value.trim(),special_text:$("s-sp-text").value.trim(),special_days:days,updated_at:new Date().toISOString()}).eq("studio",STUDIO);
   if(r.error){toast("Не удалось сохранить");return}
   toast("Сохранено");load();
@@ -536,7 +577,7 @@ $("dl").addEventListener("click",async function(){
     host.innerHTML="";
     var blob=await new Promise(function(r){canvas.toBlob(r,"image/png")});
     var month=((state.cfg&&state.cfg.month)||"").toLowerCase().replace(/\s+/g,"-");
-    var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="raspisanie-moskovskiy"+(state.mode==="grid"?"-setka":"")+(month?"-"+month:"")+".png";
+    var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="raspisanie-"+STUDIO+(state.mode==="grid"?"-setka":"")+(month?"-"+month:"")+".png";
     document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},5000);
   }catch(e){toast("Не получилось сохранить картинку")}
   finally{btn.disabled=false;btn.textContent="Скачать PNG"}
