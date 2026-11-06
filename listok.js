@@ -10,7 +10,7 @@
 
   var RULES = [
     ["nidra", /нидра|йогическ[а-яё]* сон|йога сна|для (комфортного )?сна/],
-    ["aero", /аэро|гамак/],
+    ["aero", /аэро(?!бик)|гамак/],
     ["pil", /пилатес/],
     ["back", /спин|позвоночн|йогатерап|йога-терап/],
     ["str", /растяжк|шпагат|гибк|мфр|мобильн|сустав/],
@@ -63,7 +63,8 @@
     else if (rest && rest.length <= 28 && !/лет/.test(rest)) { s += " · " + rest; rest = ""; }
     s = norm(s.replace(/\s+[iI]$/, "").replace(/[|,.\s]+$/, "")).replace(/^аэро(\s+(для\s+)?дет)/i, "аэройога$1");
     // Аббревиатуры из исходника (TRX, ЛФК, МФР) — сохранить заглавными
-    var abbr = norm(raw) === norm(raw).toUpperCase() ? [] : (norm(raw).match(/(^|[^A-Za-zА-Яа-яЁё])([A-ZА-ЯЁ]{2,5})(?=$|[^A-Za-zА-Яа-яЁё])/g) || []).map(function (w) { return w.replace(/^[^A-Za-zА-Яа-яЁё]/, ""); });
+    // латиница (TRX) или кириллица до 3 букв (ТБС, ЛФК); «ЙОГА», набранная капсом, — обычное слово
+    var abbr = norm(raw) === norm(raw).toUpperCase() ? [] : (norm(raw).match(/(^|[^A-Za-zА-Яа-яЁё])([A-Z]{2,5}|[А-ЯЁ]{2,3})(?=$|[^A-Za-zА-Яа-яЁё])/g) || []).map(function (w) { return w.replace(/^[^A-Za-zА-Яа-яЁё]/, ""); });
     var out = cap(s.toLowerCase().replace(/мфр/g, "МФР").replace(/айенгар/g, "Айенгар"));
     abbr.forEach(function (w) { out = out.replace(new RegExp("(^|[^A-Za-zА-Яа-яЁё])" + w.toLowerCase() + "(?=$|[^A-Za-zА-Яа-яЁё])", "i"), function (m, p) { return p + w; }); });
     return out;
