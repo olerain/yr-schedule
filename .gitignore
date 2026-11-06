@@ -1,0 +1,13 @@
+.DS_Store
+.env*
+!.env.example
+node_modules/
+.venv/
+__pycache__/
+data/
+tmp/
+slides-codex/output/
+slides-codex/.build/*
+!slides-codex/.build/*.py
+!slides-codex/.build/*.mjs
+!slides-codex/.build/*.sh
