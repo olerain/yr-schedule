@@ -82,7 +82,8 @@ function dLabel(s){var d=new Date(s+"T12:00:00");return WD[d.getDay()]+" "+Strin
 var params=new URLSearchParams(location.search),STUDIO=params.get("studio")||"moskovsky";
 var st={studios:[],cfg:null,dirs:{},classes:[],events:[]};
 
-function weekDates(){var t=new Date(),dd=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-dd);return DAYS.map(function(_,i){var d=new Date(mon);d.setDate(mon.getDate()+i);return d})}
+function curMonday(){var t=new Date(),dd=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-dd);return iso(mon)}
+function weekDates(from){var mon=new Date((from||curMonday())+"T12:00:00");return DAYS.map(function(_,i){var d=new Date(mon);d.setDate(mon.getDate()+i);return d})}
 function render(){
   var cfg=st.cfg;
   if(!cfg){$("main").innerHTML='<div class="note">Такой студии нет. Выберите студию вверху.</div>';return}
@@ -91,9 +92,12 @@ function render(){
   var tel=(cfg.phone||"").replace(/[^\d+]/g,"");
   $("phone").hidden=!tel;$("phone").textContent=cfg.phone||"";$("phone").href="tel:"+tel;
   $("call").hidden=!tel;$("call").href="tel:"+tel;
-  $("app").hidden=!cfg.app_url;$("app").href=cfg.app_url||"#";
-  var wd=weekDates(),todayIdx=(new Date().getDay()+6)%7,nowM=new Date().getHours()*60+new Date().getMinutes();
-  $("days").innerHTML=DSH.map(function(d,i){return '<button type="button" data-d="'+i+'" aria-pressed="'+(i===todayIdx)+'">'+d+'<small>'+wd[i].getDate()+'</small></button>'}).join("");
+  var appOk=/^https?:\/\//i.test(cfg.app_url||"");
+  $("app").hidden=!appOk;$("app").href=appOk?cfg.app_url:"#";
+  // Расписание может быть уже на следующую неделю (week_from) — тогда «сегодня» и «прошло» не показываем
+  var thisWeek=!cfg.week_from||cfg.week_from<=curMonday();
+  var wd=weekDates(thisWeek?null:cfg.week_from),todayIdx=thisWeek?(new Date().getDay()+6)%7:-1,nowM=new Date().getHours()*60+new Date().getMinutes();
+  $("days").innerHTML=DSH.map(function(d,i){return '<button type="button" data-d="'+i+'" aria-pressed="'+(i===Math.max(0,todayIdx))+'">'+d+'<small>'+wd[i].getDate()+'</small></button>'}).join("");
   var html=[];
   for(var d=0;d<7;d++){
     var cs=st.classes.filter(function(c){return c.day===d}).sort(function(a,b){return toMin(a.start_time)-toMin(b.start_time)});
@@ -120,7 +124,7 @@ $("studio").addEventListener("change",function(){STUDIO=this.value;var u=new URL
 async function load(){
   var today=iso(new Date()),lim=new Date();lim.setDate(lim.getDate()+30);
   var r=await Promise.all([
-    sb.from("sched_settings").select("studio,name,sort,address,phone,app_url,show_teachers"),
+    sb.from("sched_settings").select("*"),
     sb.from("sched_dirs").select("key,tag"),
     sb.from("sched_classes").select("day,start_time,end_time,name,dir,tag,teacher,badge").eq("studio",STUDIO),
     sb.from("sched_events").select("date,start_time,end_time,title,note,teacher").eq("studio",STUDIO).gte("date",today).lte("date",iso(lim)).order("date").order("start_time")
@@ -132,7 +136,7 @@ async function load(){
   st.classes=r[2].data||[];st.events=r[3].error?[]:(r[3].data||[]);
   $("studio").innerHTML=st.studios.map(function(s){return '<option value="'+esc(s.studio)+'"'+(s.studio===STUDIO?" selected":"")+'>'+esc(s.name||s.studio)+'</option>'}).join("");
   render();
-  var t=$("d"+((new Date().getDay()+6)%7));if(t&&!load.done&&window.scrollY<10)t.scrollIntoView({block:"start"});load.done=true;
+  var t=document.querySelector(".day.today");if(t&&!load.done&&window.scrollY<10)t.scrollIntoView({block:"start"});load.done=true;
 }
 load();
 setInterval(load,10*60*1000);

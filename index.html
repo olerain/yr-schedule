@@ -215,7 +215,7 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
           </div>
           <div id="impPrev" hidden>
             <div style="font-weight:700;font-size:17px" id="impTitle">Что придёт из Listok</div>
-            <div class="hint">Занятия студии будут заменены этим списком. Отметки «новое/замена/отмена» сохранятся у совпавших занятий. Мастер-классы добавятся на свои даты.</div>
+            <div class="hint">Занятия студии будут заменены этим списком. Отметки сохранятся у тех же занятий. Мастер-классы из Listok за эту неделю обновятся, добавленные вручную останутся.</div>
             <div class="imp" id="impList"></div>
             <div class="err" id="impErr" hidden></div>
             <div class="actions"><button type="button" class="btn primary" id="impApply">Заменить расписание</button><button type="button" class="btn" id="impCancel">Отмена</button></div>
@@ -292,7 +292,7 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
           <label class="chk"><input type="checkbox" id="s-teach"> Показывать преподавателей в картинке для клиентов</label>
           <div style="font-size:13px;font-weight:600;color:var(--muted);margin-top:6px">Автопостинг в Telegram</div>
           <label class="chk"><input type="checkbox" id="s-tg-on"> Каждый понедельник утром отправлять картинку в канал</label>
-          <label class="f">Канал или чат<input type="text" id="s-tg-chat" placeholder="@yogiroom_optikov"><span class="hint">Бот должен быть администратором канала</span></label>
+          <label class="f">Канал или чат<input type="text" id="s-tg-chat" placeholder="@yogiroom_optikov"><span class="hint">Бот должен быть администратором канала. Канал задаёт админ</span></label>
           <label class="f">Залы в Listok<input type="text" id="s-rooms" placeholder="1"><span class="hint">Номера через запятую, меняет только админ</span></label>
           <div style="font-size:13px;font-weight:600;color:var(--muted);margin-top:6px">Только для сетки</div>
           <label class="f">Заголовок<input type="text" id="s-title"></label>
@@ -334,6 +334,9 @@ var BADGE={new:"новое",sub:"замена",cancel:"отмена"};
 function todayISO(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function addDays(iso,n){var d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+n);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 var WD=["вс","пн","вт","ср","чт","пт","сб"];
+/* Понедельник недели по Москве (студии в Петербурге), со сдвигом в днях */
+function mskMonday(shift){var p=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Moscow",year:"numeric",month:"2-digit",day:"2-digit",weekday:"short"}).formatToParts(new Date()),o={};p.forEach(function(x){o[x.type]=x.value});
+  var wd={Mon:0,Tue:1,Wed:2,Thu:3,Fri:4,Sat:5,Sun:6}[o.weekday]||0;return addDays(o.year+"-"+o.month+"-"+o.day,(shift||0)-wd)}
 function dLabel(iso){var d=new Date(iso+"T12:00:00");return WD[d.getDay()]+" "+String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")}
 var W={list:1080,grid:1600},BG={list:"#00aab4",grid:"#ffffff"};
 var $=function(id){return document.getElementById(id)};
@@ -411,7 +414,7 @@ function posterHTML(){return state.mode==="grid"?gridHTML():listHTML()}
 
 var qrCache={url:null,src:""};
 function qrSrc(url){
-  if(!url||typeof qrcode!=="function")return "";
+  if(!url||!/^https?:\/\//i.test(url)||typeof qrcode!=="function")return "";
   if(qrCache.url===url)return qrCache.src;
   var src="";
   try{
@@ -684,13 +687,16 @@ $("d-save").addEventListener("click",async function(){
 function fillSettings(){
   var c=state.cfg||{};
   $("s-name").value=c.name||"";$("s-month").value=c.month||"";$("s-app-url").value=c.app_url||"";$("s-app-text").value=c.app_text||"";$("s-title").value=c.title||"";$("s-addr").value=c.address||"";$("s-footer").value=c.footer||"";$("s-phone").value=c.phone||"";
-  $("s-teach").checked=!!c.show_teachers;$("s-tg-on").checked=!!c.tg_enabled;$("s-tg-chat").value=c.tg_chat||"";$("s-rooms").value=(c.listok_rooms||[]).join(", ");$("s-rooms").disabled=!state.access.all;
+  $("s-teach").checked=!!c.show_teachers;$("s-tg-on").checked=!!c.tg_enabled;$("s-tg-chat").value=c.tg_chat||"";$("s-rooms").value=(c.listok_rooms||[]).join(", ");$("s-rooms").disabled=!state.access.all;$("s-tg-chat").disabled=!state.access.all;
   $("s-sp-on").checked=!!c.special_enabled;$("s-sp-title").value=c.special_title||"";$("s-sp-text").value=c.special_text||"";
   $("s-sp-days").innerHTML=DSH.map(function(d,i){return '<label class="chk"><input type="checkbox" id="sd-'+i+'"'+((c.special_days||[]).indexOf(i)>=0?" checked":"")+'> '+d+'</label>'}).join("");
 }
 $("s-save").addEventListener("click",async function(){
   var days=[];for(var i=0;i<7;i++)if($("sd-"+i).checked)days.push(i);
-  var upd={show_teachers:$("s-teach").checked,tg_enabled:$("s-tg-on").checked,tg_chat:$("s-tg-chat").value.trim()};
+  var appUrl=$("s-app-url").value.trim();
+  if(appUrl&&!/^https?:\/\//i.test(appUrl)){toast("Ссылка на приложение должна начинаться с https://");return}
+  var upd={show_teachers:$("s-teach").checked,tg_enabled:$("s-tg-on").checked};
+  if(state.access.all)upd.tg_chat=$("s-tg-chat").value.trim();
   if(state.access.all)upd.listok_rooms=$("s-rooms").value.split(/[\s,;]+/).filter(function(x){return /^\d+$/.test(x)}).map(Number);
   var r=await sb.from("sched_settings").update({name:$("s-name").value.trim(),month:$("s-month").value.trim(),app_url:$("s-app-url").value.trim(),app_text:$("s-app-text").value.trim(),title:$("s-title").value.trim(),address:$("s-addr").value.trim(),footer:$("s-footer").value.trim(),phone:$("s-phone").value.trim(),
     special_enabled:$("s-sp-on").checked,special_title:$("s-sp-title").value.trim(),special_text:$("s-sp-text").value.trim(),special_days:days,updated_at:new Date().toISOString()}).eq("studio",STUDIO);
@@ -754,13 +760,14 @@ $("impBtn").addEventListener("click",async function(){
   var btn=$("impBtn"),hint=$("impHint");btn.disabled=true;hint.textContent="Listok отвечает долго, до минуты…";
   try{
     var wk="";
-    if($("impWeek").value==="next"){var t=new Date(),dd=(t.getDay()+6)%7;t.setDate(t.getDate()-dd+7);wk=String(t.getDate()).padStart(2,"0")+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+t.getFullYear()}
+    var isNext=$("impWeek").value==="next";
+    if(isNext){var m=mskMonday(7);wk=m.slice(8,10)+"-"+m.slice(5,7)+"-"+m.slice(0,4)}
     var j=await fetchListok(rooms,wk);
     var cls=[],mcs=[];
     j.events.forEach(function(ev){var r=YRListok.convert(ev,state.lmap);if(r.skip)return;if(r.master)mcs.push(r);else cls.push(r)});
     var dirKeys=state.dirs.map(function(d){return d.key});
     cls.forEach(function(c){if(dirKeys.indexOf(c.dir)<0)c.dir=dirKeys[0]});
-    imp={cls:cls,mcs:mcs,dates:j.dates||[]};
+    imp={cls:cls,mcs:mcs,dates:j.dates||[],next:isNext};
     var dm=dirMap(),html=[];
     for(var d=0;d<7;d++){var cs=cls.filter(function(c){return c.day===d});if(!cs.length)continue;
       html.push('<div class="ih">'+DAYS[d]+'</div>');
@@ -768,7 +775,8 @@ $("impBtn").addEventListener("click",async function(){
     if(mcs.length){html.push('<div class="ih">Мастер-классы</div>');mcs.forEach(function(m){html.push('<div class="ir"><span></span><span class="tm">'+dLabel(m.date)+' '+pad(m.start)+'</span><span>'+esc(m.title)+'</span></div>')})}
     $("impTitle").textContent="Из Listok: "+cls.length+" занятий"+(mcs.length?" и "+mcs.length+" мастер-класс(ов)":"")+(imp.dates.length?" · неделя "+dLabel(imp.dates[0])+"–"+dLabel(imp.dates[imp.dates.length-1]):"");
     $("impList").innerHTML=html.join("")||'<div class="empty">В Listok на эту неделю занятий нет</div>';
-    $("impErr").hidden=true;$("impPrev").hidden=false;$("impBox").hidden=true;
+    $("impErr").textContent=isNext&&new Date().getDay()>=1&&new Date().getDay()<=4?"Это следующая неделя. После замены клиенты сразу увидят её на живой странице и картинке, хотя текущая ещё идёт. Лучше импортировать её в пятницу–воскресенье.":"";$("impErr").hidden=!$("impErr").textContent;
+    $("impPrev").hidden=false;$("impBox").hidden=true;
     $("impApply").disabled=!cls.length;
   }catch(e){toast("Не удалось получить расписание из Listok. Попробуйте позже")}
   finally{btn.disabled=false;hint.textContent="Подтянуть неделю из CRM Listok"}
@@ -777,8 +785,9 @@ function impClose(){imp=null;$("impPrev").hidden=true;$("impBox").hidden=false}
 $("impCancel").addEventListener("click",impClose);
 $("impApply").addEventListener("click",async function(){
   if(!imp)return;var btn=$("impApply"),err=$("impErr");btn.disabled=true;err.hidden=true;
-  var keep={};state.classes.forEach(function(c){if(c.badge)keep[c.day+"|"+c.start]=c.badge});
-  var cls=imp.cls.map(function(c){return {day:c.day,start:c.start,end:c.end&&toMin(c.end)>toMin(c.start)?c.end:pad(toMin(c.start)+60),name:c.name,dir:c.dir,tag:c.tag,teacher:c.teacher,badge:keep[c.day+"|"+c.start]||""}});
+  // Отметки переносим только на то же занятие (день, время, название); «отмена» и «замена» на новую неделю не переходят
+  var keep={};state.classes.forEach(function(c){if(c.badge&&(!imp.next||c.badge==="new"))keep[c.day+"|"+c.start+"|"+String(c.name).toLowerCase()]=c.badge});
+  var cls=imp.cls.map(function(c){return {day:c.day,start:c.start,end:c.end&&toMin(c.end)>toMin(c.start)?c.end:pad(toMin(c.start)+60),name:c.name,dir:c.dir,tag:c.tag,teacher:c.teacher,badge:keep[c.day+"|"+c.start+"|"+String(c.name).toLowerCase()]||""}});
   var evs=imp.mcs.map(function(m){return {date:m.date,start:m.start,end:m.end||"",title:m.title,note:m.note,teacher:m.teacher}});
   var r=await sb.rpc("sched_replace_week",{p_studio:STUDIO,p_classes:cls,p_events:evs,p_from:imp.dates[0]||null,p_to:imp.dates[imp.dates.length-1]||null});
   btn.disabled=false;

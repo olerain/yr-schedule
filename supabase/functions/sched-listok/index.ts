@@ -32,10 +32,10 @@ Deno.serve(async (req) => {
   const rooms = (url.searchParams.get("rooms") || "").split(",").map((s) => s.trim()).filter((s) => /^\d+$/.test(s));
   const weekRaw = (url.searchParams.get("week") || "").trim();
   const week = /^[0-9A-Za-z_.-]{1,20}$/.test(weekRaw) ? weekRaw : "";
-  if (!rooms.length) return json({ error: "rooms required" }, 400);
+  if (!rooms.length || rooms.length > 10) return json({ error: "rooms: 1–10 номеров" }, 400);
 
   try {
-    const page = await fetch(`${BASE}/wapi?onlyOffice=1&officeId=0&iframe=true`, { redirect: "follow" });
+    const page = await fetch(`${BASE}/wapi?onlyOffice=1&officeId=0&iframe=true`, { redirect: "follow", signal: AbortSignal.timeout(20000) });
     const html = await page.text();
     const cookie = cookiesFrom(page);
     const token = (html.match(/name="csrf-token"\s+content="([^"]+)"/) || html.match(/token['"]?\s*[:=]\s*['"]([A-Za-z0-9]{20,})['"]/) || [])[1] || "";
@@ -51,6 +51,7 @@ Deno.serve(async (req) => {
         ...(token ? { "X-CSRF-TOKEN": token } : {}),
       },
       body,
+      signal: AbortSignal.timeout(90000),
     });
     if (!r.ok) return json({ error: `listok ${r.status}` }, 502);
     const data = await r.json();
