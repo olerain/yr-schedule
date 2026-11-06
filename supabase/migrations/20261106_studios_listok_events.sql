@@ -92,3 +92,26 @@ from public.sched_settings s,
 ) as v(studio,name,sort,address,phone,rooms)
 where s.studio = 'moskovsky'
 on conflict (studio) do nothing;
+
+-- Импорт недели одной транзакцией. SECURITY INVOKER: действуют обычные права (RLS) редактора.
+create or replace function public.sched_replace_week(p_studio text, p_classes jsonb, p_events jsonb, p_from date, p_to date)
+returns void language plpgsql security invoker set search_path to ''
+as $$
+begin
+  if not public.sched_can_edit(p_studio) then raise exception 'no access to %', p_studio; end if;
+  delete from public.sched_classes where studio = p_studio;
+  insert into public.sched_classes (studio, day, start_time, end_time, name, dir, tag, teacher, badge, time_label)
+  select p_studio, (c->>'day')::int, (c->>'start')::time, (c->>'end')::time, c->>'name', c->>'dir',
+         coalesce(c->>'tag',''), coalesce(c->>'teacher',''), coalesce(c->>'badge',''), ''
+  from jsonb_array_elements(coalesce(p_classes,'[]'::jsonb)) c;
+  if p_from is not null and p_to is not null and jsonb_array_length(coalesce(p_events,'[]'::jsonb)) > 0 then
+    delete from public.sched_events where studio = p_studio and date between p_from and p_to;
+    insert into public.sched_events (studio, date, start_time, end_time, title, note, teacher)
+    select p_studio, (e->>'date')::date, (e->>'start')::time, nullif(e->>'end','')::time, e->>'title',
+           coalesce(e->>'note',''), coalesce(e->>'teacher','')
+    from jsonb_array_elements(p_events) e;
+  end if;
+end;
+$$;
+revoke execute on function public.sched_replace_week(text, jsonb, jsonb, date, date) from public, anon;
+grant execute on function public.sched_replace_week(text, jsonb, jsonb, date, date) to authenticated;
