@@ -1,10 +1,15 @@
 // Edge-функция: неделя расписания из виджета CRM Listok для залов студии.
-// GET ?rooms=12,50[&week=<значение next из прошлого ответа>]  →  { week, next, prev, dates, events: [{date, day, start, end, name, teacher, room, type}] }
+// GET ?crm=spb|msk|vrn&office=0&rooms=12,50[&week=ДД-ММ-ГГГГ (понедельник)]  →  { week, next, prev, dates, events: [{date, day, start, end, name, teacher, room, type, typeName, crm}] }
 // Данные публичные (тот же виджет, что на yogiroom.ru), секретов не нужно.
 
-const BASE = "https://intgrfb3ee46e39c5fe9250f27d33fccdce57.listokcrm.ru";
-// Не занятия: массаж и индивидуальные.
-const SKIP_TYPES = new Set(["24", "25", "26", "46", "69"]);
+// Свои CRM Listok у Петербурга, Москвы и Воронежа. Только эти адреса — запросы в другие места невозможны.
+const CRM: Record<string, string> = {
+  spb: "https://intgrfb3ee46e39c5fe9250f27d33fccdce57.listokcrm.ru",
+  msk: "https://intgr1dfb47ada9a83b48c6d2c7851c23250b.listokcrm.ru",
+  vrn: "https://intgrf820f255cbf4cda49987c50b70efca7b.listokcrm.ru",
+};
+// Не занятия: массаж и индивидуальные (по названию типа — номера в каждой CRM свои)
+const SKIP_TYPE_NAME = /массаж|индивидуальн/i;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -32,16 +37,21 @@ Deno.serve(async (req) => {
   const rooms = (url.searchParams.get("rooms") || "").split(",").map((s) => s.trim()).filter((s) => /^\d+$/.test(s));
   const weekRaw = (url.searchParams.get("week") || "").trim();
   const week = /^[0-9A-Za-z_.-]{1,20}$/.test(weekRaw) ? weekRaw : "";
-  if (!rooms.length || rooms.length > 10) return json({ error: "rooms: 1–10 номеров" }, 400);
+  if (!rooms.length || rooms.length > 30) return json({ error: "rooms: 1–30 номеров" }, 400);
+  const crm = url.searchParams.get("crm") || "spb";
+  const BASE = CRM[crm];
+  if (!BASE) return json({ error: "crm: spb, msk или vrn" }, 400);
+  // Офис задаёт сессию виджета: в Москве и Воронеже он отдаёт занятия только своего офиса
+  const office = /^\d{1,3}$/.test(url.searchParams.get("office") || "") ? Number(url.searchParams.get("office")) : 0;
 
   try {
-    const page = await fetch(`${BASE}/wapi?onlyOffice=1&officeId=0&iframe=true`, { redirect: "follow", signal: AbortSignal.timeout(20000) });
+    const page = await fetch(`${BASE}/wapi?onlyOffice=1&officeId=${office}&iframe=true`, { redirect: "follow", signal: AbortSignal.timeout(20000) });
     const html = await page.text();
     const cookie = cookiesFrom(page);
     const token = (html.match(/name="csrf-token"\s+content="([^"]+)"/) || html.match(/token['"]?\s*[:=]\s*['"]([A-Za-z0-9]{20,})['"]/) || [])[1] || "";
 
     // Виджет шлёт JSON (axios); неделю Listok понимает только так. week — значение next/prev, например "09-11-2026"
-    const body = JSON.stringify({ _token: token, roomId: 0, week, officeId: 0 });
+    const body = JSON.stringify({ _token: token, roomId: 0, week, officeId: office });
     const r = await fetch(`${BASE}/wapi/getScheduleData?os=1&draw=1&start=0&length=5`, {
       method: "POST",
       headers: {
@@ -56,6 +66,7 @@ Deno.serve(async (req) => {
     if (!r.ok) return json({ error: `listok ${r.status}` }, 502);
     const data = await r.json();
     const ev = data?.week?.events || {};
+    const typeNames: Record<string, string> = data?.week?.filters?.grouptype || {};
     const want = new Set(rooms);
     const out: Record<string, unknown>[] = [];
     const dates = new Set<string>();
@@ -63,7 +74,8 @@ Deno.serve(async (req) => {
       dates.add(d);
       if (!want.has(String(e.roomId))) continue;
       const type = String(e.groupTypeId ?? e.grouptypeId ?? e.grouptype ?? "");
-      if (SKIP_TYPES.has(type)) continue;
+      const typeName = String(typeNames[type] || "");
+      if (SKIP_TYPE_NAME.test(typeName)) continue;
       const day = (new Date(d + "T12:00:00Z").getUTCDay() + 6) % 7; // пн = 0
       out.push({
         date: d, day,
@@ -71,7 +83,7 @@ Deno.serve(async (req) => {
         end: String(e.endTime || "").slice(0, 5),
         name: String(e.groupName || "").replace(/\s+/g, " ").trim(),
         teacher: String(e.teacherName || "").replace(/\s+/g, " ").trim(),
-        room: String(e.roomId), type,
+        room: String(e.roomId), type, typeName, crm,
       });
     }
     out.sort((a, b) => String(a.date + a.start).localeCompare(String(b.date + b.start)));
