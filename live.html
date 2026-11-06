@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Расписание YOGI ROOM</title>
+<meta name="description" content="Расписание групповых занятий студии YOGI ROOM">
+<meta name="theme-color" content="#00aab4">
+<style>
+@font-face{font-family:"Tilda Sans";src:url(fonts/TildaSans-Regular.ttf) format("truetype");font-weight:400}
+@font-face{font-family:"Tilda Sans";src:url(fonts/TildaSans-Medium.ttf) format("truetype");font-weight:500}
+@font-face{font-family:"Tilda Sans";src:url(fonts/TildaSans-Semibold.ttf) format("truetype");font-weight:600}
+:root{--bg:#00aab4;--fg:#ffffff;--soft:rgba(255,255,255,.78);--line:rgba(255,255,255,.3);--pill:rgba(255,255,255,.2);--font:"Tilda Sans","Helvetica Neue",Arial,sans-serif;color-scheme:light}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:17px;line-height:1.35;-webkit-text-size-adjust:100%}
+.wrap{max-width:720px;margin:0 auto;padding:calc(20px + env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:16px;border-bottom:2px solid var(--fg)}
+header img{height:30px;width:auto;display:block}
+select{font:inherit;font-weight:600;color:var(--fg);background:var(--pill);border:0;border-radius:999px;padding:8px 32px 8px 14px;min-height:40px;max-width:60%;appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,#fff 50%),linear-gradient(135deg,#fff 50%,transparent 50%);background-position:calc(100% - 18px) 55%,calc(100% - 13px) 55%;background-size:5px 5px;background-repeat:no-repeat}
+select option{color:#141414}
+select:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.meta{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 16px;padding:12px 0 4px;color:var(--soft);font-size:15px}
+.meta a{color:var(--fg);text-decoration:none;font-weight:600}
+.days{display:flex;gap:6px;overflow-x:auto;padding:12px 0 6px;scrollbar-width:none;position:sticky;top:0;background:var(--bg);z-index:2}
+.days::-webkit-scrollbar{display:none}
+.days button{font:inherit;font-weight:600;flex:none;border:0;border-radius:999px;background:var(--pill);color:var(--fg);padding:8px 14px;min-height:40px;cursor:pointer}
+.days button[aria-pressed="true"]{background:var(--fg);color:#00838b}
+.days button small{font-weight:400;opacity:.8;margin-left:4px}
+.day{padding:14px 0 10px;border-bottom:1px solid var(--line);scroll-margin-top:64px}
+.day h2{margin:0 0 6px;font-size:15px;line-height:20px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.day h2 span{font-weight:400;letter-spacing:0;text-transform:none;color:var(--soft);margin-left:6px}
+.day.today h2::after{content:"сегодня";margin-left:8px;font-size:12px;letter-spacing:.02em;text-transform:none;background:#fff;color:#00838b;border-radius:999px;padding:1px 8px;vertical-align:1px}
+.r{display:grid;grid-template-columns:56px minmax(0,1fr);gap:2px 12px;padding:6px 0}
+.r .t{font-variant-numeric:tabular-nums;color:var(--soft);padding-top:1px}
+.r .n{font-weight:500}
+.r .s{grid-column:2;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px;color:var(--soft)}
+.g{background:var(--pill);border-radius:999px;padding:2px 10px;color:var(--fg)}
+.b{background:#fff;color:#00838b;border-radius:999px;padding:0 8px;font-size:13px;font-weight:600;margin-left:6px;vertical-align:2px}
+.r.cancel .t,.r.cancel .nt{text-decoration:line-through;opacity:.6}
+.r.cancel .b{background:#ffe08a;color:#141414}
+.r.past{opacity:.5}
+.gap{height:10px}
+.mc{margin:18px 0 4px;padding:14px 16px;border:2px solid rgba(255,255,255,.7);border-radius:16px}
+.mc h2{margin:0 0 6px;font-size:15px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.mc .r{grid-template-columns:96px minmax(0,1fr)}
+.cta{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+.cta a{display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;border-radius:999px;background:#fff;color:#00838b;font-weight:600;text-decoration:none;font-size:17px}
+.cta a.sec{background:var(--pill);color:var(--fg)}
+.note{color:var(--soft);font-size:14px;text-align:center;padding:40px 0}
+.upd{color:var(--soft);font-size:13px;text-align:center;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="logo-white.svg" alt="YOGI ROOM">
+    <select id="studio" aria-label="Студия"></select>
+  </header>
+  <div class="meta"><span id="addr"></span><a id="phone" hidden></a></div>
+  <nav class="days" id="days" aria-label="Дни недели"></nav>
+  <main id="main"><div class="note">Загружаю расписание…</div></main>
+  <div class="cta">
+    <a id="app" hidden>Записаться в приложении</a>
+    <a id="call" class="sec" hidden>Позвонить администратору</a>
+  </div>
+  <div class="upd" id="upd"></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+var sb=window.supabase.createClient("https://hnmgnowascbkstlmhudz.supabase.co","sb_publishable_tNfXIJlGC6NEoSfKS_sS0A_mTlywn_D",{auth:{persistSession:false}});
+var DAYS=["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота","Воскресенье"],DSH=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"],WD=["вс","пн","вт","ср","чт","пт","сб"];
+var BADGE={new:"новое",sub:"замена",cancel:"отмена"};
+var $=function(id){return document.getElementById(id)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]})}
+function hm(t){return String(t||"").slice(0,5)}
+function toMin(t){var m=/^(\d{1,2}):(\d{2})/.exec(t||"");return m?(+m[1])*60+(+m[2]):NaN}
+function iso(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function dLabel(s){var d=new Date(s+"T12:00:00");return WD[d.getDay()]+" "+String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")}
+var params=new URLSearchParams(location.search),STUDIO=params.get("studio")||"moskovsky";
+var st={studios:[],cfg:null,dirs:{},classes:[],events:[]};
+
+function weekDates(){var t=new Date(),dd=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-dd);return DAYS.map(function(_,i){var d=new Date(mon);d.setDate(mon.getDate()+i);return d})}
+function render(){
+  var cfg=st.cfg;
+  if(!cfg){$("main").innerHTML='<div class="note">Такой студии нет. Выберите студию вверху.</div>';return}
+  document.title="Расписание YOGI ROOM · "+(cfg.name||cfg.studio);
+  $("addr").textContent=cfg.address||"";
+  var tel=(cfg.phone||"").replace(/[^\d+]/g,"");
+  $("phone").hidden=!tel;$("phone").textContent=cfg.phone||"";$("phone").href="tel:"+tel;
+  $("call").hidden=!tel;$("call").href="tel:"+tel;
+  $("app").hidden=!cfg.app_url;$("app").href=cfg.app_url||"#";
+  var wd=weekDates(),todayIdx=(new Date().getDay()+6)%7,nowM=new Date().getHours()*60+new Date().getMinutes();
+  $("days").innerHTML=DSH.map(function(d,i){return '<button type="button" data-d="'+i+'" aria-pressed="'+(i===todayIdx)+'">'+d+'<small>'+wd[i].getDate()+'</small></button>'}).join("");
+  var html=[];
+  for(var d=0;d<7;d++){
+    var cs=st.classes.filter(function(c){return c.day===d}).sort(function(a,b){return toMin(a.start_time)-toMin(b.start_time)});
+    var rows=[],prev=null;
+    cs.forEach(function(c){
+      var s=toMin(c.start_time),e=toMin(c.end_time);
+      if(prev!==null&&s-prev>=120)rows.push('<div class="gap"></div>');prev=isNaN(e)?s:Math.max(prev,e);
+      var tag=(c.tag||"").trim()||(st.dirs[c.dir]||{}).tag||"";
+      var past=d<todayIdx||(d===todayIdx&&!isNaN(e)&&e<nowM);
+      rows.push('<div class="r'+(c.badge==="cancel"?" cancel":"")+(past?" past":"")+'"><span class="t">'+hm(c.start_time)+'</span><span class="n"><span class="nt">'+esc(String(c.name).replace(/\s*\n\s*/g," "))+'</span>'+(BADGE[c.badge]?'<span class="b">'+BADGE[c.badge]+'</span>':'')+'</span>'+
+        '<span class="s">'+(tag?'<span class="g">'+esc(tag.toLowerCase())+'</span>':'')+'<span>'+hm(c.start_time)+'–'+hm(c.end_time)+(cfg.show_teachers&&c.teacher?' · '+esc(c.teacher):'')+'</span></span></div>');
+    });
+    html.push('<section class="day'+(d===todayIdx?" today":"")+'" id="d'+d+'"><h2>'+DAYS[d]+'<span>'+dLabel(iso(wd[d])).slice(3)+'</span></h2>'+(rows.length?rows.join(""):'<div class="r"><span></span><span class="t">Занятий нет</span></div>')+'</section>');
+  }
+  var ev=st.events;
+  if(ev.length)html.push('<section class="mc"><h2>Мастер-классы</h2>'+ev.map(function(e){return '<div class="r"><span class="t">'+dLabel(e.date)+' '+hm(e.start_time)+'</span><span class="n">'+esc(e.title)+'</span>'+(e.note||e.teacher?'<span class="s">'+esc([e.note,e.teacher].filter(Boolean).join(" · "))+'</span>':'')+'</div>'}).join("")+'</section>');
+  $("main").innerHTML=html.join("");
+  $("upd").textContent="Обновлено "+new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});
+}
+$("days").addEventListener("click",function(e){var b=e.target.closest("[data-d]");if(!b)return;
+  Array.prototype.forEach.call(this.children,function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});
+  var el=$("d"+b.getAttribute("data-d"));if(el)el.scrollIntoView({behavior:"smooth",block:"start"})});
+$("studio").addEventListener("change",function(){STUDIO=this.value;var u=new URL(location.href);u.searchParams.set("studio",STUDIO);history.replaceState(null,"",u);load()});
+async function load(){
+  var today=iso(new Date()),lim=new Date();lim.setDate(lim.getDate()+30);
+  var r=await Promise.all([
+    sb.from("sched_settings").select("studio,name,sort,address,phone,app_url,show_teachers"),
+    sb.from("sched_dirs").select("key,tag"),
+    sb.from("sched_classes").select("day,start_time,end_time,name,dir,tag,teacher,badge").eq("studio",STUDIO),
+    sb.from("sched_events").select("date,start_time,end_time,title,note,teacher").eq("studio",STUDIO).gte("date",today).lte("date",iso(lim)).order("date").order("start_time")
+  ]);
+  if(r[0].error||r[2].error){$("main").innerHTML='<div class="note">Не удалось загрузить расписание. Обновите страницу.</div>';return}
+  st.studios=(r[0].data||[]).sort(function(a,b){return (a.sort||100)-(b.sort||100)});
+  st.cfg=st.studios.find(function(s){return s.studio===STUDIO})||null;
+  st.dirs={};(r[1].data||[]).forEach(function(d){st.dirs[d.key]=d});
+  st.classes=r[2].data||[];st.events=r[3].error?[]:(r[3].data||[]);
+  $("studio").innerHTML=st.studios.map(function(s){return '<option value="'+esc(s.studio)+'"'+(s.studio===STUDIO?" selected":"")+'>'+esc(s.name||s.studio)+'</option>'}).join("");
+  render();
+  var t=$("d"+((new Date().getDay()+6)%7));if(t&&!load.done&&window.scrollY<10)t.scrollIntoView({block:"start"});load.done=true;
+}
+load();
+setInterval(load,10*60*1000);
+document.addEventListener("visibilitychange",function(){if(!document.hidden)load()});
+})();
+</script>
+</body>
+</html>

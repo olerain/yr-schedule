@@ -1,0 +1,39 @@
+name: Автопостинг расписания в Telegram
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"   # понедельник 07:17 по Москве
+  workflow_dispatch:
+    inputs:
+      studio:
+        description: "Только эта студия (ключ, например optikov). Пусто — все включённые"
+        required: false
+        default: ""
+      dry_run:
+        description: "Только собрать картинки, в Telegram не отправлять"
+        type: boolean
+        default: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install --no-save playwright@1.48.2
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/autopost.mjs
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          ONLY_STUDIO: ${{ inputs.studio }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+      - name: Картинки пробного прогона
+        if: ${{ inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: autopost-preview
+          path: /tmp/yr-autopost/*.png
+          if-no-files-found: ignore

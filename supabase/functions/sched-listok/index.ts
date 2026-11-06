@@ -40,11 +40,12 @@ Deno.serve(async (req) => {
     const cookie = cookiesFrom(page);
     const token = (html.match(/name="csrf-token"\s+content="([^"]+)"/) || html.match(/token['"]?\s*[:=]\s*['"]([A-Za-z0-9]{20,})['"]/) || [])[1] || "";
 
-    const body = new URLSearchParams({ _token: token, roomId: "0", week, officeId: "0" });
+    // Виджет шлёт JSON (axios); неделю Listok понимает только так. week — значение next/prev, например "09-11-2026"
+    const body = JSON.stringify({ _token: token, roomId: 0, week, officeId: 0 });
     const r = await fetch(`${BASE}/wapi/getScheduleData?os=1&draw=1&start=0&length=5`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Content-Type": "application/json;charset=UTF-8",
         "X-Requested-With": "XMLHttpRequest",
         ...(cookie ? { Cookie: cookie } : {}),
         ...(token ? { "X-CSRF-TOKEN": token } : {}),
