@@ -62,7 +62,8 @@ select:focus-visible,a:focus-visible,button:focus-visible{outline:2px solid #fff
   <nav class="days" id="days" aria-label="Дни недели"></nav>
   <main id="main"><div class="note">Загружаю расписание…</div></main>
   <div class="cta">
-    <a id="app" hidden>Записаться в приложении</a>
+    <a id="book" hidden target="_blank" rel="noopener">Записаться в Telegram</a>
+    <a id="app" class="sec" hidden target="_blank" rel="noopener">Записаться в приложении</a>
     <a id="call" class="sec" hidden>Позвонить администратору</a>
   </div>
   <div class="upd" id="upd"></div>
@@ -92,6 +93,8 @@ function render(){
   var tel=(cfg.phone||"").replace(/[^\d+]/g,"");
   $("phone").hidden=!tel;$("phone").textContent=cfg.phone||"";$("phone").href="tel:"+tel;
   $("call").hidden=!tel;$("call").href="tel:"+tel;
+  var tg=/^[A-Za-z0-9_]{5,32}$/.test(cfg.booking_tg||"")?cfg.booking_tg:"";
+  $("book").hidden=!tg;$("book").href=tg?"https://t.me/"+tg:"#";
   var appOk=/^https?:\/\//i.test(cfg.app_url||"");
   $("app").hidden=!appOk;$("app").href=appOk?cfg.app_url:"#";
   // Расписание может быть уже на следующую неделю (week_from) — тогда «сегодня» и «прошло» не показываем

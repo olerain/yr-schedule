@@ -288,6 +288,7 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
           <label class="f">Месяц<input type="text" id="s-month"><span class="hint">В картинке для клиентов пишется строчными</span></label>
           <label class="f">Ссылка на приложение (для QR)<input type="url" id="s-app-url"><span class="hint">Сама откроет App Store или Google Play</span></label>
           <label class="f">Текст рядом с QR<input type="text" id="s-app-text"></label>
+          <label class="f">Telegram для записи<input type="text" id="s-book-tg" placeholder="@yogiroom_moskovskiy73" autocomplete="off"><span class="hint">Куда ведёт кнопка «Записаться» на странице для клиентов</span></label>
           <label class="f">Адрес<input type="text" id="s-addr"></label>
           <label class="chk"><input type="checkbox" id="s-teach"> Показывать преподавателей в картинке для клиентов</label>
           <div style="font-size:13px;font-weight:600;color:var(--muted);margin-top:6px">Автопостинг в Telegram</div>
@@ -687,6 +688,7 @@ $("d-save").addEventListener("click",async function(){
 function fillSettings(){
   var c=state.cfg||{};
   $("s-name").value=c.name||"";$("s-month").value=c.month||"";$("s-app-url").value=c.app_url||"";$("s-app-text").value=c.app_text||"";$("s-title").value=c.title||"";$("s-addr").value=c.address||"";$("s-footer").value=c.footer||"";$("s-phone").value=c.phone||"";
+  $("s-book-tg").value=c.booking_tg?"@"+c.booking_tg:"";
   $("s-teach").checked=!!c.show_teachers;$("s-tg-on").checked=!!c.tg_enabled;$("s-tg-chat").value=c.tg_chat||"";$("s-rooms").value=(c.listok_rooms||[]).join(", ");$("s-rooms").disabled=!state.access.all;$("s-tg-chat").disabled=!state.access.all;
   $("s-sp-on").checked=!!c.special_enabled;$("s-sp-title").value=c.special_title||"";$("s-sp-text").value=c.special_text||"";
   $("s-sp-days").innerHTML=DSH.map(function(d,i){return '<label class="chk"><input type="checkbox" id="sd-'+i+'"'+((c.special_days||[]).indexOf(i)>=0?" checked":"")+'> '+d+'</label>'}).join("");
@@ -695,7 +697,9 @@ $("s-save").addEventListener("click",async function(){
   var days=[];for(var i=0;i<7;i++)if($("sd-"+i).checked)days.push(i);
   var appUrl=$("s-app-url").value.trim();
   if(appUrl&&!/^https?:\/\//i.test(appUrl)){toast("Ссылка на приложение должна начинаться с https://");return}
-  var upd={show_teachers:$("s-teach").checked,tg_enabled:$("s-tg-on").checked};
+  var bookTg=$("s-book-tg").value.trim().replace(/^https?:\/\/t\.me\//i,"").replace(/^@/,"");
+  if(bookTg&&!/^[A-Za-z0-9_]{5,32}$/.test(bookTg)){toast("Telegram: только латиница, цифры и _, от 5 символов");return}
+  var upd={show_teachers:$("s-teach").checked,tg_enabled:$("s-tg-on").checked,booking_tg:bookTg};
   if(state.access.all)upd.tg_chat=$("s-tg-chat").value.trim();
   if(state.access.all)upd.listok_rooms=$("s-rooms").value.split(/[\s,;]+/).filter(function(x){return /^\d+$/.test(x)}).map(Number);
   var r=await sb.from("sched_settings").update({name:$("s-name").value.trim(),month:$("s-month").value.trim(),app_url:$("s-app-url").value.trim(),app_text:$("s-app-text").value.trim(),title:$("s-title").value.trim(),address:$("s-addr").value.trim(),footer:$("s-footer").value.trim(),phone:$("s-phone").value.trim(),
