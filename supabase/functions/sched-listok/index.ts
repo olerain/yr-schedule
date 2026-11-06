@@ -1,12 +1,13 @@
 // Edge-функция: неделя расписания из виджета CRM Listok для залов студии.
-// GET ?crm=spb|msk|vrn&office=0&rooms=12,50[&week=ДД-ММ-ГГГГ (понедельник)]  →  { week, next, prev, dates, events: [{date, day, start, end, name, teacher, room, type, typeName, crm}] }
+// GET ?crm=spb|msk|vrn|chb&office=0&rooms=12,50[&week=ДД-ММ-ГГГГ (понедельник)]  →  { week, next, prev, dates, events: [{date, day, start, end, name, teacher, room, type, typeName, crm}] }
 // Данные публичные (тот же виджет, что на yogiroom.ru), секретов не нужно.
 
-// Свои CRM Listok у Петербурга, Москвы и Воронежа. Только эти адреса — запросы в другие места невозможны.
+// Свои CRM Listok у Петербурга, Москвы, Воронежа и Чебоксар. Только эти адреса — запросы в другие места невозможны.
 const CRM: Record<string, string> = {
   spb: "https://intgrfb3ee46e39c5fe9250f27d33fccdce57.listokcrm.ru",
   msk: "https://intgr1dfb47ada9a83b48c6d2c7851c23250b.listokcrm.ru",
   vrn: "https://intgrf820f255cbf4cda49987c50b70efca7b.listokcrm.ru",
+  chb: "https://intgr84f638a0c28c033991b8d3eae0451e2d.listokcrm.ru",
 };
 // Не занятия: массаж и индивидуальные (по названию типа — номера в каждой CRM свои)
 const SKIP_TYPE_NAME = /массаж|индивидуальн/i;
@@ -40,7 +41,7 @@ Deno.serve(async (req) => {
   if (!rooms.length || rooms.length > 30) return json({ error: "rooms: 1–30 номеров" }, 400);
   const crm = url.searchParams.get("crm") || "spb";
   const BASE = CRM[crm];
-  if (!BASE) return json({ error: "crm: spb, msk или vrn" }, 400);
+  if (!BASE) return json({ error: "crm: spb, msk, vrn или chb" }, 400);
   // Офис задаёт сессию виджета: в Москве и Воронеже он отдаёт занятия только своего офиса
   const office = /^\d{1,3}$/.test(url.searchParams.get("office") || "") ? Number(url.searchParams.get("office")) : 0;
 
