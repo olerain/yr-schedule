@@ -20,19 +20,32 @@
   function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
   function norm(s) { return String(s || "").replace(/\s+/g, " ").trim(); }
 
+  // ev.typeName — название типа группы из CRM (номера типов у Петербурга, Москвы и Воронежа разные)
+  function spb(ev) { return !ev.crm || ev.crm === "spb"; }
   function isMaster(ev) {
-    var n = norm(ev.name).toLowerCase();
-    return !!T_MASTER[String(ev.type)] || /мастер[- ]класс|специальное занятие|спец\. ?урок|открытый урок/.test(n);
+    var n = norm(ev.name).toLowerCase(), t = norm(ev.typeName).toLowerCase();
+    return (spb(ev) && !!T_MASTER[String(ev.type)]) || /мастер\s*-?\s*класс|открытый урок|спецзанят|специальн/.test(t) ||
+      /мастер\s*-?\s*класс|специальн(ое|ый) (занятие|класс)|спецкласс|спец\. ?урок|открытый урок/.test(n);
+  }
+  function typeDir(ev) {
+    var t = norm(ev.typeName).toLowerCase();
+    if (/аэро/.test(t)) return "aero";
+    if (/пилатес/.test(t)) return "pil";
+    if (/растяж|стретч/.test(t)) return "str";
+    if (/фитнес|функциональн|сил/.test(t)) return "fit";
+    if (/йога/.test(t)) return "yoga";
+    return spb(ev) ? T_DIR[String(ev.type)] : "";
   }
 
-  function guessDir(lower, type) {
+  function guessDir(lower, ev) {
     for (var i = 0; i < RULES.length; i++) if (RULES[i][1].test(lower)) return RULES[i][0];
-    return T_DIR[String(type)] || "yoga";
+    return typeDir(ev) || "yoga";
   }
 
   function cleanName(raw) {
     var s = norm(raw)
-      .replace(/\((бесплатно[^)]*|в кроссовках|занятие в гамаках|йога в гамаках)\)/gi, "")
+      .replace(/\((бесплатно[^)]*|\s*занятие в кроссовках|в кроссовках|занятие в гамаках|йога в гамаках|самомассаж)\s*\)/gi, "")
+      .replace(/\|\s*зал\s*\d+\s*$/i, "")
       .replace(/\(\s*2 занятия[^)]*\)/gi, "")
       .replace(/[|.]?\s*(для )?все[хм]? уровн[а-яё]*( подготовки)?/gi, "")
       .replace(/\(?\s*\d{2,3}\s*мин(ут[аы]?)?\s*\)?/gi, "")
@@ -57,17 +70,18 @@
   }
 
   function kidsTag(lower) {
-    var m = lower.match(/(\d{1,2})\s*-\s*(\d{1,2})\s*лет/);
+    var m = lower.match(/(\d{1,2})\s*-\s*(\d{1,2})\s*л(ет)?/);
     return m ? "дети " + m[1] + "–" + m[2] + " лет" : (/дет/.test(lower) ? "-" : "");
   }
 
   /* ev: {date, day, start, end, name, teacher, type}; map: {lowerName: {name, dir, tag}} */
   function convert(ev, map) {
     var raw = norm(ev.name), lower = raw.toLowerCase();
-    if (T_SKIP[String(ev.type)]) return { skip: true };
+    if ((spb(ev) && T_SKIP[String(ev.type)]) || /массаж|индив/i.test(norm(ev.typeName)) || /^индивидуальн|индивидуально/.test(lower)) return { skip: true };
     if (isMaster(ev)) {
-      var title = raw.replace(/^(мастер[- ]класс|специальное занятие|спец\. ?урок|открытый урок)\s*[:|]?\s*/i, "")
-        .replace(/\s*\|\s*(специальное занятие|мастер[- ]класс)\s*$/i, "")
+      var title = raw.replace(/^(мастер\s*-?\s*класс|специальн(ое|ый) (занятие|класс)|спецкласс|спец\. ?урок|открытый урок)\s*[:|]?\s*/i, "")
+        .replace(/\s*\|\s*(специальн(ое|ый) (занятие|класс)|мастер\s*-?\s*класс|лекция)\s*$/i, "")
+        .replace(/\s*\|\s*бесплатно[^|]*$/i, "")
         .replace(/[«»"]/g, "").replace(/\((бесплатно[^)]*|2 занятия[^)]*)\)/gi, "")
         .replace(/\s*\|\s*/g, ": ");
       title = norm(title);
@@ -76,13 +90,19 @@
         note: /открытый урок/i.test(raw) ? "открытый урок" : "", teacher: norm(ev.teacher) };
     }
     var hit = map && map[lower];
-    var dir = (hit && hit.dir) || guessDir(lower, ev.type);
+    var dir = (hit && hit.dir) || guessDir(lower, ev);
     var name = (hit && hit.name) || cleanName(raw);
     var tag = hit ? (hit.tag || "") : "";
     if (!hit) {
       var kt = kidsTag(lower);
-      if (kt) { tag = kt === "-" ? "" : kt; name = cleanName(raw.replace(/\d{1,2}\s*-\s*\d{1,2}\s*лет/, "").replace(/(^|\s)дети(\s|$)/i, " ")); if (!/дет/i.test(name)) name += " для детей"; name = name.replace(/^Аэро для/, "Аэройога для"); }
-      else if (/беременн/.test(lower)) tag = "для беременных";
+      if (kt) {
+        tag = kt === "-" ? "" : kt;
+        // Детские: «Аэройога для детей» / «Растяжка для детей», возраст — в тег
+        var base = cleanName(raw.replace(/\(?\s*\d{1,2}\s*-\s*\d{1,2}\s*л(ет)?\s*\)?/g, "").replace(/(^|\s|\|)дет(и|ей|ям)?(?=\s|\||,|$)/gi, " ").replace(/[,|]?\s*(начинающие|продолжающие|общая группа)/gi, ""));
+        if (dir === "aero") base = /гамак|гимнастик/i.test(base) ? base : "Аэройога";
+        name = /дет/i.test(base) ? base : base.replace(/\s+для\s*$/, "") + " для детей";
+      }
+      else if (/беременн/.test(lower) && !/беременн/i.test(name)) tag = "для беременных";
     }
     return { day: ev.day, start: ev.start, end: ev.end, name: norm(name), dir: dir, tag: tag, teacher: norm(ev.teacher), source: raw };
   }

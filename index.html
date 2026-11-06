@@ -103,7 +103,7 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
 .seg button[aria-pressed="true"]{background:var(--fg);color:#fff}
 
 /* List poster: teal, 1080px wide, for clients. --k масштабирует блок дней под формат */
-.poster.list{--k:1;width:1080px;min-height:1350px;padding:64px 64px 56px;background:#00aab4;color:#ffffff}
+.poster.list{--k:1;width:1080px;padding:64px 64px 56px;background:#00aab4;color:#ffffff}
 .poster.list.f-story{height:1920px;min-height:0;padding:96px 64px 80px}
 .poster.list.f-square{height:1080px;min-height:0;padding:48px 52px 40px}
 .list .lhd{display:flex;justify-content:space-between;align-items:center;gap:32px;padding-bottom:26px;border-bottom:3px solid #ffffff;flex:none}
@@ -138,12 +138,6 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
 .list .lmc .mr .md{opacity:.85}
 .list .lmc .mr .mt{font-weight:500}
 .list .lmc .mr .mn{font-weight:400;opacity:.75}
-.list .lf{display:flex;align-items:center;gap:28px;padding-top:30px;flex:none}
-.list .lf img{width:150px;height:150px;display:block;flex:none}
-.list .lf div{font-size:28px;line-height:36px;font-weight:500;max-width:520px}
-.list.f-square .lf{padding-top:16px;gap:20px}
-.list.f-square .lf img{width:96px;height:96px}
-.list.f-square .lf div{font-size:20px;line-height:26px}
 .list .lempty{padding:80px 0;text-align:center;font-size:26px;opacity:.85}
 .editable .lr{cursor:pointer}
 .editable .lr:hover{outline:2px solid #ffffff;outline-offset:2px}
@@ -286,8 +280,7 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
         <div class="pane" id="p-set" hidden>
           <label class="f">Название студии<input type="text" id="s-name"><span class="hint">Как студия называется в переключателе</span></label>
           <label class="f">Месяц<input type="text" id="s-month"><span class="hint">В картинке для клиентов пишется строчными</span></label>
-          <label class="f">Ссылка на приложение (для QR)<input type="url" id="s-app-url"><span class="hint">Сама откроет App Store или Google Play</span></label>
-          <label class="f">Текст рядом с QR<input type="text" id="s-app-text"></label>
+          <label class="f">Ссылка на приложение<input type="url" id="s-app-url"><span class="hint">Кнопка «Записаться в приложении» на странице для клиентов. Сама откроет App Store или Google Play</span></label>
           <label class="f">Telegram для записи<input type="text" id="s-book-tg" placeholder="@yogiroom_moskovskiy73" autocomplete="off"><span class="hint">Куда ведёт кнопка «Записаться» на странице для клиентов</span></label>
           <label class="f">Адрес<input type="text" id="s-addr"></label>
           <label class="chk"><input type="checkbox" id="s-teach"> Показывать преподавателей в картинке для клиентов</label>
@@ -315,7 +308,6 @@ label.f textarea{resize:vertical;line-height:1.35;font-family:inherit}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="qrcode.js"></script>
 <script src="listok.js"></script>
 <script>
 (function(){
@@ -374,10 +366,17 @@ async function load(){
   $("live").href="live.html?studio="+encodeURIComponent(STUDIO);
   renderStudios();applyAccess();
 }
+/* Студии по городам: <optgroup> на каждый город, если городов больше одного */
+function cityGroups(list){
+  var cities=[],by={};list.forEach(function(s){var c=s.city||"Санкт-Петербург";if(!by[c]){by[c]=[];cities.push(c)}by[c].push(s)});
+  var opt=function(s){return '<option value="'+esc(s.studio)+'">'+esc(studioName(s))+'</option>'};
+  if(cities.length<2)return list.map(opt).join("");
+  return cities.map(function(c){return '<optgroup label="'+esc(c)+'">'+by[c].map(opt).join("")+'</optgroup>'}).join("");
+}
 function studioName(s){return (s&&(s.name||s.studio))||""}
 function renderStudios(){
   var sel=$("studio");
-  sel.innerHTML=state.studios.map(function(s){return '<option value="'+esc(s.studio)+'">'+esc(studioName(s))+'</option>'}).join("");
+  sel.innerHTML=cityGroups(state.studios);
   sel.value=STUDIO;sel.hidden=state.studios.length<2;
 }
 function setStudio(s){
@@ -413,20 +412,6 @@ function refresh(){
 /* ---------- poster ---------- */
 function posterHTML(){return state.mode==="grid"?gridHTML():listHTML()}
 
-var qrCache={url:null,src:""};
-function qrSrc(url){
-  if(!url||!/^https?:\/\//i.test(url)||typeof qrcode!=="function")return "";
-  if(qrCache.url===url)return qrCache.src;
-  var src="";
-  try{
-    var q=qrcode(0,"M");q.addData(url);q.make();
-    var n=q.getModuleCount(),cell=12,cv=document.createElement("canvas");
-    cv.width=cv.height=n*cell;var ctx=cv.getContext("2d");ctx.fillStyle="#ffffff";
-    for(var r=0;r<n;r++)for(var c=0;c<n;c++)if(q.isDark(r,c))ctx.fillRect(c*cell,r*cell,cell,cell);
-    src=cv.toDataURL("image/png");
-  }catch(e){src=""}
-  qrCache={url:url,src:src};return src;
-}
 function pad(t){var m=toMin(t);return isNaN(m)?"":String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")}
 
 function listRow(c,dm,showT){
@@ -461,10 +446,8 @@ function listHTML(){
   if(!blocks.length)body='<div class="lempty">Занятий пока нет</div>';
   else if(state.fmt==="square"){var h=Math.ceil(blocks.length/2);body='<div class="lb"><div class="lcols"><div>'+blocks.slice(0,h).join("")+'</div><div>'+blocks.slice(h).join("")+'</div></div>'+mcBlock()+'</div>'}
   else body='<div class="lb">'+blocks.join("")+mcBlock()+'</div>';
-  var qr=qrSrc(cfg.app_url);
   return '<div class="lhd"><div class="lbr"><img src="logo-white.svg" alt="YOGI ROOM">'+(cfg.address?'<div class="lvr"></div><div class="la">'+esc(cfg.address)+'</div>':'')+'</div><div class="lm">'+esc(String(cfg.month||"").toLowerCase())+'</div></div>'+
-    body+
-    ((qr||cfg.app_text)?'<div class="lf">'+(qr?'<img src="'+qr+'" alt="QR-код приложения">':'')+'<div>'+esc(cfg.app_text)+'</div></div>':'');
+    body;
 }
 function posterClass(){return "poster"+(state.mode==="list"?" list"+(state.fmt!=="post"?" f-"+state.fmt:""):"")}
 /* Для сторис и квадрата подбираем масштаб блока дней, чтобы всё влезло */
@@ -687,7 +670,7 @@ $("d-save").addEventListener("click",async function(){
 /* ---------- settings ---------- */
 function fillSettings(){
   var c=state.cfg||{};
-  $("s-name").value=c.name||"";$("s-month").value=c.month||"";$("s-app-url").value=c.app_url||"";$("s-app-text").value=c.app_text||"";$("s-title").value=c.title||"";$("s-addr").value=c.address||"";$("s-footer").value=c.footer||"";$("s-phone").value=c.phone||"";
+  $("s-name").value=c.name||"";$("s-month").value=c.month||"";$("s-app-url").value=c.app_url||"";$("s-title").value=c.title||"";$("s-addr").value=c.address||"";$("s-footer").value=c.footer||"";$("s-phone").value=c.phone||"";
   $("s-book-tg").value=c.booking_tg?"@"+c.booking_tg:"";
   $("s-teach").checked=!!c.show_teachers;$("s-tg-on").checked=!!c.tg_enabled;$("s-tg-chat").value=c.tg_chat||"";$("s-rooms").value=(c.listok_rooms||[]).join(", ");$("s-rooms").disabled=!state.access.all;$("s-tg-chat").disabled=!state.access.all;
   $("s-sp-on").checked=!!c.special_enabled;$("s-sp-title").value=c.special_title||"";$("s-sp-text").value=c.special_text||"";
@@ -702,7 +685,7 @@ $("s-save").addEventListener("click",async function(){
   var upd={show_teachers:$("s-teach").checked,tg_enabled:$("s-tg-on").checked,booking_tg:bookTg};
   if(state.access.all)upd.tg_chat=$("s-tg-chat").value.trim();
   if(state.access.all)upd.listok_rooms=$("s-rooms").value.split(/[\s,;]+/).filter(function(x){return /^\d+$/.test(x)}).map(Number);
-  var r=await sb.from("sched_settings").update({name:$("s-name").value.trim(),month:$("s-month").value.trim(),app_url:$("s-app-url").value.trim(),app_text:$("s-app-text").value.trim(),title:$("s-title").value.trim(),address:$("s-addr").value.trim(),footer:$("s-footer").value.trim(),phone:$("s-phone").value.trim(),
+  var r=await sb.from("sched_settings").update({name:$("s-name").value.trim(),month:$("s-month").value.trim(),app_url:$("s-app-url").value.trim(),title:$("s-title").value.trim(),address:$("s-addr").value.trim(),footer:$("s-footer").value.trim(),phone:$("s-phone").value.trim(),
     special_enabled:$("s-sp-on").checked,special_title:$("s-sp-title").value.trim(),special_text:$("s-sp-text").value.trim(),special_days:days,updated_at:new Date().toISOString()}).eq("studio",STUDIO);
   if(!r.error)r=await sb.from("sched_settings").update(upd).eq("studio",STUDIO);
   if(r.error){toast("Не удалось сохранить");return}
@@ -755,7 +738,7 @@ $("mcForm").addEventListener("submit",async function(e){
 var FN_URL=SUPABASE_URL+"/functions/v1/sched-listok";
 var imp=null;
 async function fetchListok(rooms,week){
-  var u=FN_URL+"?rooms="+encodeURIComponent(rooms.join(","))+(week?"&week="+encodeURIComponent(week):"");
+  var u=FN_URL+"?crm="+encodeURIComponent((state.cfg&&state.cfg.listok_crm)||"spb")+"&office="+encodeURIComponent((state.cfg&&state.cfg.listok_office)||0)+"&rooms="+encodeURIComponent(rooms.join(","))+(week?"&week="+encodeURIComponent(week):"");
   var res=await fetch(u);var j=await res.json();if(!res.ok||j.error)throw new Error(j.error||("HTTP "+res.status));return j;
 }
 $("impBtn").addEventListener("click",async function(){

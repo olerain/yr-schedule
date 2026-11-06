@@ -89,7 +89,7 @@ function render(){
   var cfg=st.cfg;
   if(!cfg){$("main").innerHTML='<div class="note">Такой студии нет. Выберите студию вверху.</div>';return}
   document.title="Расписание YOGI ROOM · "+(cfg.name||cfg.studio);
-  $("addr").textContent=cfg.address||"";
+  $("addr").textContent=(cfg.city&&cfg.city!=="Санкт-Петербург"&&cfg.address.indexOf(cfg.city)<0?cfg.city+", ":"")+(cfg.address||"");
   var tel=(cfg.phone||"").replace(/[^\d+]/g,"");
   $("phone").hidden=!tel;$("phone").textContent=cfg.phone||"";$("phone").href="tel:"+tel;
   $("call").hidden=!tel;$("call").href="tel:"+tel;
@@ -137,7 +137,9 @@ async function load(){
   st.cfg=st.studios.find(function(s){return s.studio===STUDIO})||null;
   st.dirs={};(r[1].data||[]).forEach(function(d){st.dirs[d.key]=d});
   st.classes=r[2].data||[];st.events=r[3].error?[]:(r[3].data||[]);
-  $("studio").innerHTML=st.studios.map(function(s){return '<option value="'+esc(s.studio)+'"'+(s.studio===STUDIO?" selected":"")+'>'+esc(s.name||s.studio)+'</option>'}).join("");
+  var cities=[],by={};st.studios.forEach(function(s){var c=s.city||"Санкт-Петербург";if(!by[c]){by[c]=[];cities.push(c)}by[c].push(s)});
+  var opt=function(s){return '<option value="'+esc(s.studio)+'"'+(s.studio===STUDIO?" selected":"")+'>'+esc(s.name||s.studio)+'</option>'};
+  $("studio").innerHTML=cities.length<2?st.studios.map(opt).join(""):cities.map(function(c){return '<optgroup label="'+esc(c)+'">'+by[c].map(opt).join("")+'</optgroup>'}).join("");
   render();
   var t=document.querySelector(".day.today");if(t&&!load.done&&window.scrollY<10)t.scrollIntoView({block:"start"});load.done=true;
 }
