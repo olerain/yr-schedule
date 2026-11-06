@@ -1,6 +1,15 @@
 # Расписание YOGI ROOM
 
-Редактор недельного расписания студии и выгрузка картинки для мессенджеров.
+Редактор недельного расписания студий и выгрузка картинки для мессенджеров.
+
+## Где что лежит
+
+- Код: Mac `~/Projects/yr-schedule` = GitHub `olerain/yr-schedule`.
+- Документы и выгрузки: Google Drive `AI PROJECTS/G-yr-schedule` (там же `_КОНТЕКСТ`): https://drive.google.com/drive/folders/1oXSm3QrL3pXZ6c73aeJL7EMI9xO_4jkE
+- Медиа (Яндекс `disk:/AI PROJECTS/Y-yr-schedule`): пока нет.
+- `slides-codex/` — ранняя версия в Google Slides от Codex (15–28.10.2026), только генераторы; PPTX/PDF лежат в G-папке.
+
+## Как устроено
 
 - Сайт: https://olerain.github.io/yr-schedule/ (GitHub Pages, ветка `main`, корень).
 - Данные: Supabase, проект `yogi-room-admin-bot`, таблицы `sched_settings`, `sched_dirs`, `sched_classes`, `sched_editors`.
