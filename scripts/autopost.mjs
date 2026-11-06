@@ -3,7 +3,7 @@
 // Берёт студии с включённым tg_enabled и непустым tg_chat, открывает редактор,
 // жмёт «Скачать PNG» и отправляет файл в канал.
 import { chromium } from "playwright";
-import { readFile, mkdir, copyFile } from "node:fs/promises";
+import { readFile, mkdir } from "node:fs/promises";
 
 const SUPABASE_URL = "https://hnmgnowascbkstlmhudz.supabase.co";
 const KEY = "sb_publishable_tNfXIJlGC6NEoSfKS_sS0A_mTlywn_D"; // публичный ключ, только чтение
@@ -33,9 +33,11 @@ for (const s of studios) {
     await page.waitForSelector(".poster .ld, .poster .lempty", { timeout: 30000 });
     await page.waitForFunction(() => !document.getElementById("dl").disabled);
     const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 60000 }), page.click("#dl")]);
-    const file = await dl.path();
+    await mkdir("/tmp/yr-autopost", { recursive: true });
+    const file = `/tmp/yr-autopost/${s.studio}.png`;
+    await dl.saveAs(file);
     await page.close();
-    if (DRY) { await mkdir("/tmp/yr-autopost", { recursive: true }); await copyFile(file, `/tmp/yr-autopost/${s.studio}.png`); console.log("DRY", s.studio); continue; }
+    if (DRY) { console.log("DRY", s.studio, file); continue; }
     const live = `${SITE}live.html?studio=${encodeURIComponent(s.studio)}`;
     const fd = new FormData();
     fd.append("chat_id", s.tg_chat.trim());
